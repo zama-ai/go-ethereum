@@ -48,6 +48,8 @@ var PrecompiledContractsHomestead = map[common.Address]StatefulPrecompiledContra
 	common.BytesToAddress([]byte{3}):  newWrappedPrecompiledContract(&ripemd160hash{}),
 	common.BytesToAddress([]byte{4}):  newWrappedPrecompiledContract(&dataCopy{}),
 	common.BytesToAddress([]byte{19}): &fheAdd{},
+	common.BytesToAddress([]byte{20}): &setMemoryState{},
+	common.BytesToAddress([]byte{21}): &getMemoryState{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -62,6 +64,8 @@ var PrecompiledContractsByzantium = map[common.Address]StatefulPrecompiledContra
 	common.BytesToAddress([]byte{7}):  newWrappedPrecompiledContract(&bn256ScalarMulByzantium{}),
 	common.BytesToAddress([]byte{8}):  newWrappedPrecompiledContract(&bn256PairingByzantium{}),
 	common.BytesToAddress([]byte{19}): &fheAdd{},
+	common.BytesToAddress([]byte{20}): &setMemoryState{},
+	common.BytesToAddress([]byte{21}): &getMemoryState{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -77,6 +81,8 @@ var PrecompiledContractsIstanbul = map[common.Address]StatefulPrecompiledContrac
 	common.BytesToAddress([]byte{8}):  newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
 	common.BytesToAddress([]byte{9}):  newWrappedPrecompiledContract(&blake2F{}),
 	common.BytesToAddress([]byte{19}): &fheAdd{},
+	common.BytesToAddress([]byte{20}): &setMemoryState{},
+	common.BytesToAddress([]byte{21}): &getMemoryState{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -92,6 +98,8 @@ var PrecompiledContractsBerlin = map[common.Address]StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{8}):  newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
 	common.BytesToAddress([]byte{9}):  newWrappedPrecompiledContract(&blake2F{}),
 	common.BytesToAddress([]byte{19}): &fheAdd{},
+	common.BytesToAddress([]byte{20}): &setMemoryState{},
+	common.BytesToAddress([]byte{21}): &getMemoryState{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -107,6 +115,8 @@ var PrecompiledContractsBLS = map[common.Address]StatefulPrecompiledContract{
 	common.BytesToAddress([]byte{17}): newWrappedPrecompiledContract(&bls12381MapG1{}),
 	common.BytesToAddress([]byte{18}): newWrappedPrecompiledContract(&bls12381MapG2{}),
 	common.BytesToAddress([]byte{19}): &fheAdd{},
+	common.BytesToAddress([]byte{20}): &setMemoryState{},
+	common.BytesToAddress([]byte{21}): &getMemoryState{},
 }
 
 var (

@@ -62,3 +62,23 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	return input, suppliedGas, nil
 }
+
+type setMemoryState struct{}
+
+func (c *setMemoryState) RequiredGas(input []byte) uint64 {
+	return 1
+}
+
+func (c *setMemoryState) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return []byte{}, suppliedGas, nil
+}
+
+type getMemoryState struct{}
+
+func (c *getMemoryState) RequiredGas(input []byte) uint64 {
+	return 1
+}
+
+func (c *getMemoryState) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return []byte{}, suppliedGas, nil
+}

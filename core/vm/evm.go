@@ -121,6 +121,8 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+	// some arbitrary in-memory state that lives as long as the enclosing EVM
+	inMemoryState []byte
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -143,6 +145,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 func (evm *EVM) Reset(txCtx TxContext, statedb StateDB) {
 	evm.TxContext = txCtx
 	evm.StateDB = statedb
+	evm.inMemoryState = []byte{}
 }
 
 // Cancel cancels any running EVM operation. This may be called concurrently and
@@ -222,6 +225,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
+		// If it is the set memory state call, set the input to the EVM's in-memory state.
+		// Return whatever the precompiled contract returns.
+		if addr == common.BytesToAddress([]byte{20}) {
+			evm.inMemoryState = input
+		}
 		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -375,7 +383,16 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	}
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
+		// If it is the get memory state call, return the EVM's in-memory state.
+		if addr == common.BytesToAddress([]byte{21}) {
+			if gas < p.RequiredGas(input) {
+				ret, gas, err = nil, 0, ErrOutOfGas
+			} else {
+				ret, gas, err = evm.inMemoryState, gas-p.RequiredGas(input), nil
+			}
+		} else {
+			ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
+		}
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
