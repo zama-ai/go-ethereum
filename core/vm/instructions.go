@@ -513,9 +513,22 @@ func opMstore8(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
+var locationModulus *uint256.Int
+
+func init() {
+	locationModulus = uint256.NewInt(0)
+	locationModulus.SetAllOne()
+	locationModulus[3] = 0
+}
+
+func unprotectedLocation(loc uint256.Int) uint256.Int {
+	return *loc.Mod(&loc, locationModulus)
+}
+
 func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	loc := scope.Stack.peek()
-	hash := common.Hash(loc.Bytes32())
+	actual_loc := unprotectedLocation(*loc)
+	hash := common.Hash(actual_loc.Bytes32())
 	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
 	loc.SetBytes(val.Bytes())
 	return nil, nil
@@ -525,7 +538,7 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}
-	loc := scope.Stack.pop()
+	loc := unprotectedLocation(scope.Stack.pop())
 	val := scope.Stack.pop()
 	interpreter.evm.StateDB.SetState(scope.Contract.Address(),
 		loc.Bytes32(), val.Bytes32())
