@@ -41,8 +41,8 @@ type (
 	GetHashFunc func(uint64) common.Hash
 )
 
-func (evm *EVM) precompile(addr common.Address) (StatefulPrecompiledContract, bool) {
-	var precompiles map[common.Address]StatefulPrecompiledContract
+func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
+	var precompiles map[common.Address]PrecompiledContract
 	switch {
 	case evm.chainRules.IsBerlin:
 		precompiles = PrecompiledContractsBerlin
@@ -121,8 +121,6 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
-	// some arbitrary in-memory state that lives as long as the enclosing EVM
-	inMemoryState []byte
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -145,7 +143,6 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 func (evm *EVM) Reset(txCtx TxContext, statedb StateDB) {
 	evm.TxContext = txCtx
 	evm.StateDB = statedb
-	evm.inMemoryState = []byte{}
 }
 
 // Cancel cancels any running EVM operation. This may be called concurrently and
@@ -162,16 +159,6 @@ func (evm *EVM) Cancelled() bool {
 // Interpreter returns the current interpreter
 func (evm *EVM) Interpreter() *EVMInterpreter {
 	return evm.interpreter
-}
-
-// GetStateDB returns the EVM's StateDB
-func (evm *EVM) GetStateDB() StateDB {
-	return evm.StateDB
-}
-
-// GetBlockContext returns the EVM's BlockContext
-func (evm *EVM) GetBlockContext() BlockContext {
-	return evm.Context
 }
 
 // Call executes the contract associated with the addr with the given input as
@@ -225,12 +212,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		// If it is the set memory state call, set the input to the EVM's in-memory state.
-		// Return whatever the precompiled contract returns.
-		if addr == common.BytesToAddress([]byte{20}) {
-			evm.inMemoryState = input
-		}
-		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = RunPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
@@ -293,7 +275,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = RunPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -334,7 +316,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = RunPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
@@ -383,16 +365,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	}
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		// If it is the get memory state call, return the EVM's in-memory state.
-		if addr == common.BytesToAddress([]byte{21}) {
-			if gas < p.RequiredGas(input) {
-				ret, gas, err = nil, 0, ErrOutOfGas
-			} else {
-				ret, gas, err = evm.inMemoryState, gas-p.RequiredGas(input), nil
-			}
-		} else {
-			ret, gas, err = RunStatefulPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
-		}
+		ret, gas, err = RunPrecompiledContract(p, evm, caller.Address(), addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
@@ -524,8 +497,20 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 
 // Create creates a new contract using code as deployment code.
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
-	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))
-	return evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
+	nonce := evm.StateDB.GetNonce(caller.Address())
+
+	// Create the actual contract.
+	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
+	ret, contractAddr, leftOverGas, err = evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
+	if err != nil {
+		return
+	}
+
+	// Create a separate contract that would be used for protected storage.
+	// Return the actual contract's return value and contract address.
+	protectedStorageContractAddr := crypto.CreateProtectredStorageContractAddress(contractAddr)
+	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, leftOverGas, big.NewInt(0), protectedStorageContractAddr, CREATE)
+	return
 }
 
 // Create2 creates a new contract using code as deployment code.
