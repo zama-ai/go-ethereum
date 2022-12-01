@@ -508,7 +508,7 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 
 	// Create a separate contract that would be used for protected storage.
 	// Return the actual contract's return value and contract address.
-	protectedStorageContractAddr := crypto.CreateProtectredStorageContractAddress(contractAddr)
+	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, leftOverGas, big.NewInt(0), protectedStorageContractAddr, CREATE)
 	return
 }

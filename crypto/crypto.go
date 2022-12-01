@@ -109,9 +109,9 @@ func CreateAddress(b common.Address, nonce uint64) common.Address {
 	return common.BytesToAddress(Keccak256(data)[12:])
 }
 
-// CreateProtectredStorageAddress creates an ethereum contract address for protected storage
+// CreateProtectedStorageAddress creates an ethereum contract address for protected storage
 // given the corresponding contract address
-func CreateProtectredStorageContractAddress(b common.Address) common.Address {
+func CreateProtectedStorageContractAddress(b common.Address) common.Address {
 	return CreateAddress(b, 0)
 }
 

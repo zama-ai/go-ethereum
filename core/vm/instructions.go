@@ -559,7 +559,7 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	loc := scope.Stack.peek()
 	hash := common.Hash(loc.Bytes32())
 	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
-	protectedStorage := crypto.CreateProtectredStorageContractAddress(scope.Contract.Address())
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
 	protectedSlotIdx := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !protectedSlotIdx.IsZero() {
 		// If this is a ciphertext, verify it automatically.
@@ -592,7 +592,7 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
 	verifiedCiphertext, isVerified := interpreter.verifiedCiphertexts[newValHash]
-	protectedStorage := crypto.CreateProtectredStorageContractAddress(scope.Contract.Address())
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
 	if newValHash != oldValHash {
 		// If the value is no longer stored in actual contract storage, garbage collect the ciphertext from protected storage or decrease the refcount by 1.
 		existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, oldValHash)

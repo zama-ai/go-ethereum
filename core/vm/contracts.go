@@ -1114,12 +1114,12 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	}
 	_, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok {
-		// TODO: Currently, we just indicate by sending 1s if the reencryption would have taken place.
+		// TODO: Currently, we just sends 1s if the reencryption would have taken place.
 		r := make([]byte, 32)
 		for i := range r {
 			r[i] = 1
 		}
 		return r, nil
 	}
-	return []byte{}, nil
+	return []byte{}, errors.New("unverified ciphertext handle")
 }
