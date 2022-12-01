@@ -541,13 +541,6 @@ func newCiphertextMetadata(buf [32]byte) *ciphertextMetadata {
 	return m.deserialize(buf)
 }
 
-func min(a uint64, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func newInt(buf []byte) *uint256.Int {
 	i := uint256.NewInt(0)
 	return i.SetBytes(buf)
@@ -556,27 +549,30 @@ func newInt(buf []byte) *uint256.Int {
 var zero = uint256.NewInt(0).Bytes32()
 
 func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, contractAddress common.Address) {
-	_, alreadyVerified := interpreter.verifiedCiphertexts[val]
-	if alreadyVerified {
-		return
-	}
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
 	protectedSlotIdx := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !protectedSlotIdx.IsZero() {
 		metadata := newCiphertextMetadata(protectedSlotIdx.Bytes32())
-		ciphertext := make([]byte, metadata.length)
+		ctBytes := make([]byte, metadata.length)
 		left := metadata.length
 		for {
 			if left == 0 {
 				break
 			}
 			bytes := interpreter.evm.StateDB.GetState(protectedStorage, protectedSlotIdx.Bytes32())
-			toAppend := min(uint64(len(bytes)), left)
+			toAppend := minUint64(uint64(len(bytes)), left)
 			left -= toAppend
-			ciphertext = append(ciphertext, bytes[0:toAppend]...)
+			ctBytes = append(ctBytes, bytes[0:toAppend]...)
 			protectedSlotIdx.AddUint64(protectedSlotIdx, 1)
 		}
-		interpreter.verifiedCiphertexts[val] = verifiedCiphertext{interpreter.evm.depth, ciphertext}
+		verifiedCt, alreadyVerified := interpreter.verifiedCiphertexts[val]
+		if alreadyVerified {
+			verifiedCt.depth = minInt(verifiedCt.depth, interpreter.evm.depth)
+		} else {
+			verifiedCt.depth = interpreter.evm.depth
+			verifiedCt.ciphertext = ctBytes
+		}
+		interpreter.verifiedCiphertexts[val] = verifiedCt
 	}
 }
 

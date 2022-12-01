@@ -1149,10 +1149,3 @@ func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, call
 	}
 	return nil, errors.New("unverified ciphertext handle")
 }
-
-func minInt(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
