@@ -555,14 +555,14 @@ func newInt(buf []byte) *uint256.Int {
 
 var zero = uint256.NewInt(0).Bytes32()
 
-func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	loc := scope.Stack.peek()
-	hash := common.Hash(loc.Bytes32())
-	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
-	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
+func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, contractAddress common.Address) {
+	_, alreadyVerified := interpreter.verifiedCiphertexts[val]
+	if alreadyVerified {
+		return
+	}
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
 	protectedSlotIdx := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !protectedSlotIdx.IsZero() {
-		// If this is a ciphertext, verify it automatically.
 		metadata := newCiphertextMetadata(protectedSlotIdx.Bytes32())
 		ciphertext := make([]byte, metadata.length)
 		left := metadata.length
@@ -578,8 +578,77 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 		}
 		interpreter.verifiedCiphertexts[val] = verifiedCiphertext{interpreter.evm.depth, ciphertext}
 	}
+}
+
+func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	loc := scope.Stack.peek()
+	hash := common.Hash(loc.Bytes32())
+	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
+	verifyIfCiphertextHandle(val, interpreter, scope.Contract.Address())
 	loc.SetBytes(val.Bytes())
 	return nil, nil
+}
+
+// If a verified ciphertext:
+// * if the ciphertext does not exist in protected storage, persist it with a refCount = 1
+// * if the ciphertexts exists in protected, bump its refCount by 1
+func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
+	verifiedCiphertext, isVerified := interpreter.verifiedCiphertexts[val]
+	if !isVerified {
+		return
+	}
+	// Try to read ciphertext metadata from protected storage.
+	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
+	metadata := ciphertextMetadata{}
+	if metadataInt.IsZero() {
+		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
+		metadata.refCount = 1
+		metadata.length = uint64(len(verifiedCiphertext.ciphertext))
+		ciphertextSlot := newInt(val.Bytes())
+		ct := make([]byte, 32)
+		for i, b := range verifiedCiphertext.ciphertext {
+			if i%32 == 0 && i != 0 {
+				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
+				ciphertextSlot.AddUint64(ciphertextSlot, 1)
+				ct = make([]byte, 32)
+			} else {
+				ct = append(ct, b)
+			}
+		}
+		if len(ct) != 0 {
+			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
+		}
+	} else {
+		// If metadata exists, bump the refcount by 1.
+		metadata := newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
+		metadata.refCount++
+	}
+	// Save the metadata in protected storage.
+	interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
+}
+
+// If references are still left, reduce refCount by 1. Otherwise, zero out the metadata and the ciphertext slots.
+func garbageCollectProtectedStorage(oldVal common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
+	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, oldVal)
+	existingMetadataInt := newInt(existingMetadataHash.Bytes())
+	if !existingMetadataInt.IsZero() {
+		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
+		if metadata.refCount == 1 {
+			interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, zero)
+			slot := existingMetadataInt.AddUint64(existingMetadataInt, 1)
+			slotsToZero := metadata.length / 32
+			if metadata.length < 32 {
+				slotsToZero++
+			}
+			for i := uint64(0); i < slotsToZero; i++ {
+				interpreter.evm.StateDB.SetState(protectedStorage, slot.Bytes32(), zero)
+				slot.AddUint64(existingMetadataInt, 1)
+			}
+		} else if metadata.refCount > 1 {
+			metadata.refCount--
+			interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, metadata.serialize())
+		}
+	}
 }
 
 func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
@@ -591,62 +660,12 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValBytes := newVal.Bytes()
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
-	verifiedCiphertext, isVerified := interpreter.verifiedCiphertexts[newValHash]
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
 	if newValHash != oldValHash {
-		// If the value is no longer stored in actual contract storage, garbage collect the ciphertext from protected storage or decrease the refcount by 1.
-		existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, oldValHash)
-		existingMetadataInt := newInt(existingMetadataHash.Bytes())
-		if !existingMetadataInt.IsZero() {
-			metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
-			if metadata.refCount == 1 {
-				interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, zero)
-				slot := existingMetadataInt.AddUint64(existingMetadataInt, 1)
-				slotsToZero := metadata.length / 32
-				if metadata.length < 32 {
-					slotsToZero++
-				}
-				for i := uint64(0); i < slotsToZero; i++ {
-					interpreter.evm.StateDB.SetState(protectedStorage, slot.Bytes32(), zero)
-					slot.AddUint64(existingMetadataInt, 1)
-				}
-			} else if metadata.refCount > 1 {
-				metadata.refCount--
-				interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, metadata.serialize())
-			}
-		}
-
-		// Add to protected storage or update the existing refcount.
-		if isVerified {
-			// If the value is a verified ciphertext, read its metadata from protected storage.
-			metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, newValHash).Bytes())
-			metadata := ciphertextMetadata{}
-			if metadataInt.IsZero() {
-				// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
-				metadata.refCount = 1
-				metadata.length = uint64(len(verifiedCiphertext.ciphertext))
-				ciphertextSlot := newInt(newValBytes)
-				ct := make([]byte, 32)
-				for i, b := range verifiedCiphertext.ciphertext {
-					if i%32 == 0 && i != 0 {
-						interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
-						ciphertextSlot.AddUint64(ciphertextSlot, 1)
-						ct = make([]byte, 32)
-					} else {
-						ct = append(ct, b)
-					}
-				}
-				if len(ct) != 0 {
-					interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
-				}
-			} else {
-				// If metadata exists, bump the refcount by 1.
-				metadata := newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, newValHash))
-				metadata.refCount++
-			}
-			// Save the metadata in protected storage.
-			interpreter.evm.StateDB.SetState(protectedStorage, newValHash, metadata.serialize())
-		}
+		// Since the old value is no longer stored in actual contract storage, run garbage collection on protected storage.
+		garbageCollectProtectedStorage(oldValHash, protectedStorage, interpreter)
+		// If a verified ciphertext, persist to protected storage.
+		persistIfVerifiedCiphertext(newValHash, protectedStorage, interpreter)
 	}
 	// Set the SSTORE's value in the actual contract.
 	interpreter.evm.StateDB.SetState(scope.Contract.Address(),
