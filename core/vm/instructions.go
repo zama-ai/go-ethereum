@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
@@ -513,23 +514,70 @@ func opMstore8(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
-var locationModulus *uint256.Int
-
-func init() {
-	locationModulus = uint256.NewInt(0)
-	locationModulus.SetAllOne()
-	locationModulus[3] = 0
+// Ciphertext metadata is stored in protected storage, in a 32-byte slot.
+// Currently, we only utilize 16 bytes from the slot.
+type ciphertextMetadata struct {
+	refCount uint64
+	length   uint64
 }
 
-func unprotectedLocation(loc uint256.Int) uint256.Int {
-	return *loc.Mod(&loc, locationModulus)
+func (m ciphertextMetadata) serialize() [32]byte {
+	u := uint256.NewInt(0)
+	u[0] = m.refCount
+	u[1] = m.length
+	return u.Bytes32()
 }
+
+func (m *ciphertextMetadata) deserialize(buf [32]byte) *ciphertextMetadata {
+	u := uint256.NewInt(0)
+	u.SetBytes(buf[:])
+	m.refCount = u[0]
+	m.length = u[1]
+	return m
+}
+
+func newCiphertextMetadata(buf [32]byte) *ciphertextMetadata {
+	m := ciphertextMetadata{}
+	return m.deserialize(buf)
+}
+
+func min(a uint64, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func newInt(buf []byte) *uint256.Int {
+	i := uint256.NewInt(0)
+	return i.SetBytes(buf)
+}
+
+var zero = uint256.NewInt(0).Bytes32()
 
 func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	loc := scope.Stack.peek()
-	actual_loc := unprotectedLocation(*loc)
-	hash := common.Hash(actual_loc.Bytes32())
+	hash := common.Hash(loc.Bytes32())
 	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
+	protectedSlotIdx := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
+	if !protectedSlotIdx.IsZero() {
+		// If this is a ciphertext, verify it automatically.
+		metadata := newCiphertextMetadata(protectedSlotIdx.Bytes32())
+		ciphertext := make([]byte, metadata.length)
+		left := metadata.length
+		for {
+			if left == 0 {
+				break
+			}
+			bytes := interpreter.evm.StateDB.GetState(protectedStorage, protectedSlotIdx.Bytes32())
+			toAppend := min(uint64(len(bytes)), left)
+			left -= toAppend
+			ciphertext = append(ciphertext, bytes[0:toAppend]...)
+			protectedSlotIdx.AddUint64(protectedSlotIdx, 1)
+		}
+		interpreter.verifiedCiphertexts[val] = verifiedCiphertext{interpreter.evm.depth, ciphertext}
+	}
 	loc.SetBytes(val.Bytes())
 	return nil, nil
 }
@@ -538,10 +586,71 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	if interpreter.readOnly {
 		return nil, ErrWriteProtection
 	}
-	loc := unprotectedLocation(scope.Stack.pop())
-	val := scope.Stack.pop()
+	loc := scope.Stack.pop()
+	newVal := scope.Stack.pop()
+	newValBytes := newVal.Bytes()
+	newValHash := common.BytesToHash(newValBytes)
+	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
+	verifiedCiphertext, isVerified := interpreter.verifiedCiphertexts[newValHash]
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
+	if newValHash != oldValHash {
+		// If the value is no longer stored in actual contract storage, garbage collect the ciphertext from protected storage or decrease the refcount by 1.
+		existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, oldValHash)
+		existingMetadataInt := newInt(existingMetadataHash.Bytes())
+		if !existingMetadataInt.IsZero() {
+			metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
+			if metadata.refCount == 1 {
+				interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, zero)
+				slot := existingMetadataInt.AddUint64(existingMetadataInt, 1)
+				slotsToZero := metadata.length / 32
+				if metadata.length < 32 {
+					slotsToZero++
+				}
+				for i := uint64(0); i < slotsToZero; i++ {
+					interpreter.evm.StateDB.SetState(protectedStorage, slot.Bytes32(), zero)
+					slot.AddUint64(existingMetadataInt, 1)
+				}
+			} else if metadata.refCount > 1 {
+				metadata.refCount--
+				interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, metadata.serialize())
+			}
+		}
+
+		// Add to protected storage or update the existing refcount.
+		if isVerified {
+			// If the value is a verified ciphertext, read its metadata from protected storage.
+			metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, newValHash).Bytes())
+			metadata := ciphertextMetadata{}
+			if metadataInt.IsZero() {
+				// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
+				metadata.refCount = 1
+				metadata.length = uint64(len(verifiedCiphertext.ciphertext))
+				ciphertextSlot := newInt(newValBytes)
+				ct := make([]byte, 32)
+				for i, b := range verifiedCiphertext.ciphertext {
+					if i%32 == 0 && i != 0 {
+						interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
+						ciphertextSlot.AddUint64(ciphertextSlot, 1)
+						ct = make([]byte, 32)
+					} else {
+						ct = append(ct, b)
+					}
+				}
+				if len(ct) != 0 {
+					interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
+				}
+			} else {
+				// If metadata exists, bump the refcount by 1.
+				metadata := newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, newValHash))
+				metadata.refCount++
+			}
+			// Save the metadata in protected storage.
+			interpreter.evm.StateDB.SetState(protectedStorage, newValHash, metadata.serialize())
+		}
+	}
+	// Set the SSTORE's value in the actual contract.
 	interpreter.evm.StateDB.SetState(scope.Contract.Address(),
-		loc.Bytes32(), val.Bytes32())
+		loc.Bytes32(), newValHash)
 	return nil, nil
 }
 
@@ -816,6 +925,13 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	offset, size := scope.Stack.pop(), scope.Stack.pop()
 	ret := scope.Memory.GetPtr(int64(offset.Uint64()), int64(size.Uint64()))
+
+	// Remove all verified ciphertexts that have depth > current depth - 1
+	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
+		if verifiedCiphertext.depth > interpreter.evm.depth-1 {
+			delete(interpreter.verifiedCiphertexts, key)
+		}
+	}
 
 	return ret, errStopToken
 }

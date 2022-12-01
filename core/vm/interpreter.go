@@ -52,6 +52,11 @@ type keccakState interface {
 	Read([]byte) (int, error)
 }
 
+type verifiedCiphertext struct {
+	depth      int
+	ciphertext []byte
+}
+
 // EVMInterpreter represents an EVM interpreter
 type EVMInterpreter struct {
 	evm *EVM
@@ -62,6 +67,8 @@ type EVMInterpreter struct {
 
 	readOnly   bool   // Whether to throw on stateful modifications
 	returnData []byte // Last CALL's return data for subsequent reuse
+
+	verifiedCiphertexts map[common.Hash]verifiedCiphertext // A map from a ciphertext hash to itself and stack depth at which it is verified
 }
 
 // NewEVMInterpreter returns a new instance of the Interpreter.
@@ -102,8 +109,9 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	}
 
 	return &EVMInterpreter{
-		evm: evm,
-		cfg: cfg,
+		evm:                 evm,
+		cfg:                 cfg,
+		verifiedCiphertexts: make(map[common.Hash]verifiedCiphertext),
 	}
 }
 
