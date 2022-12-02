@@ -80,3 +80,17 @@ func allZero(b []byte) bool {
 	}
 	return true
 }
+
+func minUint64(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func minInt(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

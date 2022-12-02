@@ -2,55 +2,108 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
-// Ciphertext: 0x0102abcdef0102abcdef0102abcdef0102abcdef0102abcdef0102abcdefabab
+contract Precompiles {
+    function precompile_reencrypt(uint256 in_handle) internal view returns (uint256 out_handle) {
+        bytes32[1] memory input;
+        input[0] = bytes32(in_handle);
+        bytes32[1] memory output;
+        assembly {
+            if iszero(staticcall(gas(), 67, input, 32, output, 32)) {
+                revert(0, 0)
+            }
+        }
+        out_handle = uint256(output[0]);
+    }
 
-contract Handles {
-    bytes32 public handle;
-    bytes32 public bogus_handle = 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbb;
+    function precompile_verify(bytes memory ciphertext) internal view returns (uint256 out_handle) {
+        bytes32[1] memory output;
+        uint256 len = ciphertext.length;
+        assembly {
+            if iszero(staticcall(gas(), 66, add(ciphertext, 32), len, output, 32)) {
+                revert(0, 0)
+            }
+        }
+        out_handle = uint256(output[0]);
+    }
 
-    function store(bytes32 ciphertext) public payable {
-        handle = verify(ciphertext);
+    function precompile_delegate(uint256 in_handle) internal view {
+        bytes32[1] memory input;
+        input[0] = bytes32(in_handle);
+        assembly {
+            if iszero(staticcall(gas(), 68, input, 32, 0, 0)) {
+                revert(0, 0)
+            }
+        }
+    }
+}
+
+// Ciphertext: 0x0102abcdef
+
+contract HandleOwner is Precompiles {
+    uint256 public handle;
+    uint256 public bogus_handle = 42;
+    Callee callee;
+
+    constructor(address callee_addr) {
+        callee = Callee(callee_addr);
+    }
+
+    function store(bytes memory ciphertext) public {
+        handle = precompile_verify(ciphertext);
     }
 
     // If called before `ovewrite_handle()`, `reencrypt()` must suceed.
-    function reencrypt() public view returns (bytes32) {
-        return reencrypt(handle);
+    function reencrypt() public view returns (uint256) {
+        return precompile_reencrypt(handle);
     }
 
     // `reencrypt()` must fail or return zeroes.
-    function reencrypt_bogus() public view returns (bytes32) {
-        return reencrypt(bogus_handle);
+    function reencrypt_bogus() public view returns (uint256) {
+        return precompile_reencrypt(bogus_handle);
     }
 
-    // Makes the handle invalid. `reencrypt()` must fail or return zeroes.
+    // Makes the handle invalid. Subsequent `reencrypt()`s must fail or return zeroes.
     function overwrite_handle() public payable {
         handle = bogus_handle;
     }
 
-    // The `reencrypt()` precompiled contract.
-    function reencrypt(bytes32 _handle) private view returns (bytes32 out) {
-        bytes32[1] memory input_array;
-        input_array[0] = _handle;
-        bytes32[1] memory out_array;
-        assembly {
-            if iszero(staticcall(gas(), 67, input_array, 32, out_array, 32)) {
-                revert(0, 0)
-            }
-        }
-        out = out_array[0];
+    // Returns the handle without delegation. Callers using it must fail.
+    function get_handle_without_delegate() public view returns (uint256) {
+        return handle;
     }
 
-    // The `verify()` precompiled contract.
-    function verify(bytes32 ciphertext) private returns (bytes32 out) {
-        bytes32[1] memory input_array;
-        input_array[0] = ciphertext;
-        uint256 value = 0;
-        bytes32[1] memory out_array;
-        assembly {
-            if iszero(call(gas(), 66, value, input_array, 32, out_array, 32)) {
-                revert(0, 0)
-            }
-        }
-        out = out_array[0];
+    // Returns the handle with delegation. Callers using it must succeed.
+    function get_handle_with_delegate() public view returns (uint256) {
+        precompile_delegate(handle);
+        return handle;
+    }
+
+    // Should work as we (as owners) are calling it.
+    function callee_reencrypt() public view returns (uint256) {
+        return callee.reencrypt(handle);
+    }
+}
+
+contract Callee is Precompiles {
+    function reencrypt(uint256 handle) public view returns (uint256) {
+        return precompile_reencrypt(handle);
+    } 
+}
+
+contract Caller is Precompiles {
+    HandleOwner owner;
+
+    constructor(address owner_addr) {
+        owner = HandleOwner(owner_addr);
+    }
+
+    // Fails, because the owner hasn't delegated.
+    function reencrypt_without_delegate() public view returns (uint256) {
+        return precompile_reencrypt(owner.get_handle_without_delegate());
+    }
+
+    // Succeeds, because the owner hasn't delegated.
+    function reencrypt_with_delegate() public view returns (uint256) {
+        return precompile_reencrypt(owner.get_handle_with_delegate());
     }
 }

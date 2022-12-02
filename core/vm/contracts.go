@@ -56,6 +56,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
+	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -74,6 +75,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
+	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -93,6 +95,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
+	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -112,6 +115,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
+	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -131,6 +135,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
+	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 }
 
 var (
@@ -1110,7 +1115,7 @@ func (e *reencrypt) RequiredGas(input []byte) uint64 {
 
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	if len(input) != 32 {
-		return []byte{}, errors.New("invalid ciphertext handle")
+		return nil, errors.New("invalid ciphertext handle")
 	}
 	_, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok {
@@ -1121,5 +1126,26 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		}
 		return r, nil
 	}
-	return []byte{}, errors.New("unverified ciphertext handle")
+	return nil, errors.New("unverified ciphertext handle")
+}
+
+type delegateCiphertext struct{}
+
+func (e *delegateCiphertext) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+	if len(input) != 32 {
+		return nil, errors.New("invalid ciphertext handle")
+	}
+	hash := common.BytesToHash(input)
+	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[hash]
+	if ok {
+		ct.depth = minInt(ct.depth, accessibleState.Interpreter().evm.depth-1)
+		accessibleState.Interpreter().verifiedCiphertexts[hash] = ct
+		return nil, nil
+	}
+	return nil, errors.New("unverified ciphertext handle")
 }
