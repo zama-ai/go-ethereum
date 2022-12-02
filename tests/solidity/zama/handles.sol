@@ -67,9 +67,11 @@ contract HandleOwner is Precompiles {
         handle = bogus_handle;
     }
 
-    // Returns the handle without delegation. Callers using it must fail.
+    // Returns the handle without delegation. Callers using it must succeed
+    // due to automatic delegation.
     function get_handle_without_delegate() public view returns (uint256) {
-        return handle;
+        uint256 h = handle;
+        return h;
     }
 
     // Returns the handle with delegation. Callers using it must succeed.
@@ -81,6 +83,11 @@ contract HandleOwner is Precompiles {
     // Should work as we (as owners) are calling it.
     function callee_reencrypt() public view returns (uint256) {
         return callee.reencrypt(handle);
+    }
+
+    function load_handle_without_returning_it() public view returns(uint256) {
+        uint256 h = handle + 1;
+        return h;
     }
 }
 
@@ -97,13 +104,19 @@ contract Caller is Precompiles {
         owner = HandleOwner(owner_addr);
     }
 
-    // Fails, because the owner hasn't delegated.
+    // Succeeds, because we do automatic delegation on return.
     function reencrypt_without_delegate() public view returns (uint256) {
         return precompile_reencrypt(owner.get_handle_without_delegate());
     }
 
-    // Succeeds, because the owner hasn't delegated.
+    // Succeeds, because there is an explicit delegate by the caller.
     function reencrypt_with_delegate() public view returns (uint256) {
         return precompile_reencrypt(owner.get_handle_with_delegate());
+    }
+
+    // Fails, because the owner hasn't delegated, even though the handle is valid.
+    function reencrypt_with_a_valid_handle(uint256 handle) public view returns (uint256) {
+        owner.load_handle_without_returning_it();
+        return precompile_reencrypt(handle);
     }
 }

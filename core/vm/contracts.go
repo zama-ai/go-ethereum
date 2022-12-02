@@ -1102,7 +1102,7 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	// TODO: Accept a proof from `input` too
 	ctHash := crypto.Keccak256Hash(input)
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext{accessibleState.Interpreter().evm.depth, input}
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, input}
 	return ctHash.Bytes(), nil
 }
 
@@ -1140,11 +1140,9 @@ func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, call
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
-	hash := common.BytesToHash(input)
-	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[hash]
+	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok {
 		ct.depth = minInt(ct.depth, accessibleState.Interpreter().evm.depth-1)
-		accessibleState.Interpreter().verifiedCiphertexts[hash] = ct
 		return nil, nil
 	}
 	return nil, errors.New("unverified ciphertext handle")
