@@ -43,9 +43,11 @@ contract HandleOwner is Precompiles {
     uint256 public handle;
     uint256 public bogus_handle = 42;
     Callee callee;
+    address payable owner;
 
     constructor(address callee_addr) {
         callee = Callee(callee_addr);
+        owner = payable(msg.sender);
     }
 
     function store(bytes memory ciphertext) public {
@@ -88,6 +90,11 @@ contract HandleOwner is Precompiles {
     function load_handle_without_returning_it() public view returns(uint256) {
         uint256 h = handle + 1;
         return h;
+    }
+
+    function destruct() public {
+        require(msg.sender == owner);
+        selfdestruct(owner);
     }
 }
 
