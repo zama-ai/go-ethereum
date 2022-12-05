@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/holiman/uint256"
@@ -93,4 +95,8 @@ func minInt(a int, b int) int {
 		return a
 	}
 	return b
+}
+
+func contains(haystack []byte, needle []byte) bool {
+	return strings.Contains(string(haystack), string(needle))
 }

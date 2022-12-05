@@ -569,8 +569,7 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		if alreadyVerified {
 			verifiedCt.depth = minInt(verifiedCt.depth, interpreter.evm.depth)
 		} else {
-			verifiedCt.depth = interpreter.evm.depth
-			verifiedCt.ciphertext = ctBytes
+			verifiedCt = &verifiedCiphertext{interpreter.evm.depth, ctBytes}
 		}
 		interpreter.verifiedCiphertexts[val] = verifiedCt
 	}
@@ -941,9 +940,12 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	offset, size := scope.Stack.pop(), scope.Stack.pop()
 	ret := scope.Memory.GetPtr(int64(offset.Uint64()), int64(size.Uint64()))
 
-	// Remove all verified ciphertexts that have depth > current depth - 1
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
-		if verifiedCiphertext.depth > interpreter.evm.depth-1 {
+		if contains(ret, key.Bytes()) {
+			// If a handle is returned, automatically make it available to the caller.
+			verifiedCiphertext.depth = minInt(verifiedCiphertext.depth, interpreter.evm.depth-1)
+		} else if verifiedCiphertext.depth > interpreter.evm.depth-1 {
+			// Remove any ciphertexts that are not delegated for use by the caller.
 			delete(interpreter.verifiedCiphertexts, key)
 		}
 	}
