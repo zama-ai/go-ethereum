@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: BSD-3-Clause-Clear
 
 pragma solidity >=0.7.0 <0.9.0;
 
