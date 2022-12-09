@@ -550,11 +550,13 @@ var zero = uint256.NewInt(0).Bytes32()
 
 func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, contractAddress common.Address) {
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
-	protectedSlotIdx := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
-	if !protectedSlotIdx.IsZero() {
-		metadata := newCiphertextMetadata(protectedSlotIdx.Bytes32())
+	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
+	if !metadataInt.IsZero() {
+		metadata := newCiphertextMetadata(metadataInt.Bytes32())
 		ctBytes := make([]byte, metadata.length)
 		left := metadata.length
+		protectedSlotIdx := newInt(val.Bytes())
+		protectedSlotIdx.AddUint64(protectedSlotIdx, 1)
 		for {
 			if left == 0 {
 				break
@@ -600,6 +602,7 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		metadata.refCount = 1
 		metadata.length = uint64(len(verifiedCiphertext.ciphertext))
 		ciphertextSlot := newInt(val.Bytes())
+		ciphertextSlot.AddUint64(ciphertextSlot, 1)
 		ct := make([]byte, 32)
 		for i, b := range verifiedCiphertext.ciphertext {
 			if i%32 == 0 && i != 0 {
