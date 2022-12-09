@@ -553,7 +553,7 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !metadataInt.IsZero() {
 		metadata := newCiphertextMetadata(metadataInt.Bytes32())
-		ctBytes := make([]byte, metadata.length)
+		ctBytes := make([]byte, 0)
 		left := metadata.length
 		protectedSlotIdx := newInt(val.Bytes())
 		protectedSlotIdx.AddUint64(protectedSlotIdx, 1)
@@ -603,18 +603,20 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		metadata.length = uint64(len(verifiedCiphertext.ciphertext))
 		ciphertextSlot := newInt(val.Bytes())
 		ciphertextSlot.AddUint64(ciphertextSlot, 1)
-		ct := make([]byte, 32)
+		ctPart32 := make([]byte, 32)
+		partIdx := 0
 		for i, b := range verifiedCiphertext.ciphertext {
 			if i%32 == 0 && i != 0 {
-				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
+				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
 				ciphertextSlot.AddUint64(ciphertextSlot, 1)
-				ct = make([]byte, 32)
-			} else {
-				ct = append(ct, b)
+				ctPart32 = make([]byte, 32)
+				partIdx = 0
 			}
+			ctPart32[partIdx] = b
+			partIdx++
 		}
-		if len(ct) != 0 {
-			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ct))
+		if len(ctPart32) != 0 {
+			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
 		}
 	} else {
 		// If metadata exists, bump the refcount by 1.
