@@ -620,7 +620,7 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		}
 	} else {
 		// If metadata exists, bump the refcount by 1.
-		metadata := newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
+		metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
 		metadata.refCount++
 	}
 	// Save the metadata in protected storage.
@@ -628,21 +628,27 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 }
 
 // If references are still left, reduce refCount by 1. Otherwise, zero out the metadata and the ciphertext slots.
-func garbageCollectProtectedStorage(oldVal common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
-	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, oldVal)
+func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
+	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, metadataKey)
 	existingMetadataInt := newInt(existingMetadataHash.Bytes())
 	if !existingMetadataInt.IsZero() {
 		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
 		if metadata.refCount == 1 {
-			interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, zero)
-			slot := existingMetadataInt.AddUint64(existingMetadataInt, 1)
+			// Zero the metadata key-value.
+			interpreter.evm.StateDB.SetState(protectedStorage, metadataKey, zero)
+
+			// Set the slot to the one after the metadata one.
+			slot := newInt(metadataKey.Bytes())
+			slot.AddUint64(slot, 1)
+
+			// Zero the ciphertext slots.
 			slotsToZero := metadata.length / 32
-			if metadata.length < 32 {
+			if metadata.length > 0 && metadata.length < 32 {
 				slotsToZero++
 			}
 			for i := uint64(0); i < slotsToZero; i++ {
 				interpreter.evm.StateDB.SetState(protectedStorage, slot.Bytes32(), zero)
-				slot.AddUint64(existingMetadataInt, 1)
+				slot.AddUint64(slot, 1)
 			}
 		} else if metadata.refCount > 1 {
 			metadata.refCount--
