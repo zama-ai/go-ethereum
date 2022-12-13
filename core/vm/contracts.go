@@ -49,6 +49,41 @@ void add_encrypted_integers(BufferView sks_view, BufferView ct1_view, BufferView
 	destroy_shortint_ciphertext(ct2);
 	destroy_shortint_ciphertext(result_ct);
 }
+
+
+void encrypt_integer(BufferView cks_buff_view, uint64_t val, Buffer* ct_buf)
+{
+	ShortintCiphertext *ct = NULL;
+	ShortintClientKey *cks = NULL;
+
+	int deser_ok = shortint_deserialize_client_key(cks_buff_view, &cks);
+	assert(deser_ok == 0);
+
+	int encrypt_ok = shortint_client_key_encrypt(cks, val, &ct);
+	assert(encrypt_ok == 0);
+
+	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
+	assert(ser_ok == 0);
+}
+
+uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
+{
+	ShortintCiphertext *ct = NULL;
+	ShortintClientKey *cks = NULL;
+	uint64_t res = -1;
+
+	int cks_deser_ok = shortint_deserialize_client_key(cks_buf_view, &cks);
+	assert(cks_deser_ok == 0);
+
+	int ct_deser_ok = shortint_deserialize_ciphertext(ct_buf_view, &ct);
+	assert(ct_deser_ok == 0);
+
+	int ct_decrypt = shortint_client_key_decrypt(cks, ct, &res);
+	assert(ct_decrypt == 0);
+
+	return res;
+}
+
 */
 import "C"
 
@@ -57,6 +92,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"unsafe"
@@ -96,6 +132,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &fheDecrypt{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -115,6 +152,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &fheDecrypt{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -135,6 +173,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &fheDecrypt{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -155,6 +194,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &fheDecrypt{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -175,6 +215,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &fheDecrypt{},
 }
 
 var (
@@ -1189,6 +1230,65 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	C.free(cCiphertext2)
 
 	return ctHash[:], nil
+}
+
+type fheDecrypt struct{}
+
+func (e *fheDecrypt) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *fheDecrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+	if len(input) != 32 {
+		return nil, errors.New("Input needs to contain one 256-bit sized value")
+	}
+
+	verifiedCiphertext1, exists := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input[0:32])]
+	if !exists {
+		// do something here about u256-u256/u256-ciphertext/ciphertext-u256 addition,
+		// not sure how it's defined.
+	}
+
+	// serializedSks, err := os.ReadFile("/home/ldemir/Documents/dev/blockchain/go-ethereum/core/vm/keys/sks")
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	var decoded_cks_str = "0c010000000000000000000020000000000000000100000000000000000000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000014010000000000000000000020000000000000000100000000000000000000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000020000000000000005c00000000000000000000000a0000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000a00000000000000010000000000000020000000000000005d58a7a27f665d399b2ba1869b8426390f0000000000000001000000000000000600000000000000030000000000000001000000000000000f00000000000000bd89d897b2d2bc380000000000000000000000000000000008000000000000000100000000000000"
+	serializedcks, err := hex.DecodeString(decoded_cks_str)
+	if err != nil {
+		return nil, err
+	}
+
+	cCiphertext1 := C.CBytes(verifiedCiphertext1.ciphertext)
+	viewCiphertext1 := C.BufferView{
+		pointer: (*C.uchar)(cCiphertext1),
+		length:  (C.ulong)(len(verifiedCiphertext1.ciphertext)),
+	}
+
+	cServerKey := C.CBytes(serializedcks)
+	viewServerKey := C.BufferView{
+		pointer: (*C.uchar)(cServerKey),
+		length:  (C.ulong)(len(serializedcks)),
+	}
+
+	// we need all those conversions because the precompiled contract
+	// must return a byte array
+	decryted_value := C.decrypt_integer(viewServerKey, viewCiphertext1)
+	dec := uint(decryted_value)
+	hex_value := fmt.Sprintf("%x", dec)
+	bytes_values := []byte(hex_value)
+
+	err = os.WriteFile("/tmp/decryption_result", bytes_values, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	C.free(cServerKey)
+	C.free(cCiphertext1)
+
+	return bytes_values, nil
 }
 
 type verifyCiphertext struct{}
