@@ -92,9 +92,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
+	"strconv"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -104,6 +104,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -133,6 +134,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 	common.BytesToAddress([]byte{69}): &fheDecrypt{},
+	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -153,6 +155,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 	common.BytesToAddress([]byte{69}): &fheDecrypt{},
+	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -174,6 +177,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 	common.BytesToAddress([]byte{69}): &fheDecrypt{},
+	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -195,6 +199,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 	common.BytesToAddress([]byte{69}): &fheDecrypt{},
+	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -216,6 +221,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
 	common.BytesToAddress([]byte{69}): &fheDecrypt{},
+	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 var (
@@ -1250,11 +1256,6 @@ func (e *fheDecrypt) Run(accessibleState PrecompileAccessibleState, caller commo
 		// not sure how it's defined.
 	}
 
-	// serializedSks, err := os.ReadFile("/home/ldemir/Documents/dev/blockchain/go-ethereum/core/vm/keys/sks")
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	var decoded_cks_str = "0c010000000000000000000020000000000000000100000000000000000000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000014010000000000000000000020000000000000000100000000000000000000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000020000000000000005c00000000000000000000000a0000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000a00000000000000010000000000000020000000000000005d58a7a27f665d399b2ba1869b8426390f0000000000000001000000000000000600000000000000030000000000000001000000000000000f00000000000000bd89d897b2d2bc380000000000000000000000000000000008000000000000000100000000000000"
 	serializedcks, err := hex.DecodeString(decoded_cks_str)
 	if err != nil {
@@ -1276,11 +1277,9 @@ func (e *fheDecrypt) Run(accessibleState PrecompileAccessibleState, caller commo
 	// we need all those conversions because the precompiled contract
 	// must return a byte array
 	decryted_value := C.decrypt_integer(viewServerKey, viewCiphertext1)
-	dec := uint(decryted_value)
-	hex_value := fmt.Sprintf("%x", dec)
-	bytes_values := []byte(hex_value)
+	decryted_value_bytes := uint256.NewInt(uint64(decryted_value)).Bytes()
 
-	err = os.WriteFile("/tmp/decryption_result", bytes_values, 0644)
+	err = os.WriteFile("/tmp/decryption_result", decryted_value_bytes, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1288,7 +1287,60 @@ func (e *fheDecrypt) Run(accessibleState PrecompileAccessibleState, caller commo
 	C.free(cServerKey)
 	C.free(cCiphertext1)
 
-	return bytes_values, nil
+	return decryted_value_bytes, nil
+}
+
+type fheEncrypt struct{}
+
+func (e *fheEncrypt) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *fheEncrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+
+	value, err := strconv.ParseInt(common.Bytes2Hex(input), 16, 64)
+	if err != nil {
+		return nil, errors.New("error during conversion from smart contract input to uint")
+	}
+
+	if (value) < 0 {
+		return nil, errors.New("input must be greater than 0")
+	}
+
+	// TODO: load this key from file
+	var decoded_cks_str = "0c010000000000000000000020000000000000000100000000000000000000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000014010000000000000000000020000000000000000100000000000000000000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000020000000000000005c00000000000000000000000a0000000000000000000000000000000100000000000000000000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000a00000000000000010000000000000020000000000000005d58a7a27f665d399b2ba1869b8426390f0000000000000001000000000000000600000000000000030000000000000001000000000000000f00000000000000bd89d897b2d2bc380000000000000000000000000000000008000000000000000100000000000000"
+	serializedcks, err := hex.DecodeString(decoded_cks_str)
+	if err != nil {
+		return nil, err
+	}
+
+	cServerKey := C.CBytes(serializedcks)
+	viewServerKey := C.BufferView{
+		pointer: (*C.uchar)(cServerKey),
+		length:  (C.ulong)(len(serializedcks)),
+	}
+
+	result := &C.Buffer{}
+	C.encrypt_integer(viewServerKey, C.ulong(value), result)
+
+	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
+	verifiedCiphertext := &verifiedCiphertext{
+		depth:      accessibleState.Interpreter().evm.depth,
+		ciphertext: ctBytes,
+	}
+
+	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
+
+	C.free(cServerKey)
+
+	return ctHash[:], nil
 }
 
 type verifyCiphertext struct{}
