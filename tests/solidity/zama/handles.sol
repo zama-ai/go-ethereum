@@ -3,6 +3,45 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 contract Precompiles {
+
+    function precompile_add(uint256 handle1, uint256 handle2) internal view returns (uint256 out_handle) {
+        bytes32[2] memory input;
+        input[0] = bytes32(handle1);
+        input[1] = bytes32(handle2);
+        bytes32[1] memory output;
+        assembly {
+            if iszero(staticcall(gas(), 65, input, 64, output, 32)) {
+                revert(0, 0)
+            }
+        }
+        out_handle = uint256(output[0]);
+    }
+
+    function precompile_decrypt(uint256 handle1) internal view returns (uint256 out_handle) {
+        bytes32[1] memory input;
+        input[0] = bytes32(handle1);
+        bytes32[1] memory output;
+        assembly {
+            if iszero(staticcall(gas(), 69, input, 32, output, 32)) {
+                revert(0, 0)
+            }
+        }
+        out_handle = uint256(output[0]);
+
+    }
+
+    function precompile_encrypt(uint256  to_be_encrypted) internal view returns (uint256 out_handle) {
+        bytes32[1] memory input;
+        input[0] = bytes32(to_be_encrypted);
+        bytes32[1] memory output;
+        assembly {
+            if iszero(staticcall(gas(), 70, input, 32, output, 32)) {
+                revert(0, 0)
+            }
+        }
+         out_handle = uint256(output[0]);
+    }
+
     function precompile_reencrypt(uint256 in_handle) internal view returns (uint256 out_handle) {
         bytes32[1] memory input;
         input[0] = bytes32(in_handle);
@@ -41,6 +80,7 @@ contract Precompiles {
 
 contract HandleOwner is Precompiles {
     uint256 public handle;
+    uint256 public handle2;
     uint256 public bogus_handle = 42;
     Callee callee;
     address payable owner;
@@ -52,6 +92,22 @@ contract HandleOwner is Precompiles {
 
     function store(bytes memory ciphertext) public {
         handle = precompile_verify(ciphertext);
+    }
+
+     function store2(bytes memory ciphertext) public {
+        handle2 = precompile_verify(ciphertext);
+    }
+
+    function add() public view returns (uint256) {
+        return precompile_add(handle, handle2);
+    }
+
+    function decrypt() public view returns (uint256) {
+        return precompile_decrypt(handle);
+    }
+
+    function encrypt(uint256  input) public view returns (uint256) {
+        return precompile_encrypt(input);
     }
 
     // If called before `ovewrite_handle()`, `reencrypt()` must suceed.
