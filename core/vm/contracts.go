@@ -1100,9 +1100,17 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+	const MinInputSize = 65544
+	if len(input) < MinInputSize {
+		return nil, errors.New("invalid input")
+	}
+
+	// TODO: treat the first `MinInputSize` as ciphertext.
+	ciphertext := input[0:MinInputSize]
+
 	// TODO: Accept a proof from `input` too
-	ctHash := crypto.Keccak256Hash(input)
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, input}
+	ctHash := crypto.Keccak256Hash(ciphertext)
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ciphertext}
 	return ctHash.Bytes(), nil
 }
 
