@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -1100,15 +1101,12 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
-	const MinInputSize = 65544
-	if len(input) < MinInputSize {
-		return nil, errors.New("invalid input")
-	}
+	const CiphertextSize = 65544
 
-	// TODO: treat the first `MinInputSize` as ciphertext.
-	ciphertext := input[0:MinInputSize]
+	// TODO: Verify proof.
+	// For testing: If input size <= `CiphertextSize`, treat the whole input as ciphertext.
+	ciphertext := input[0:minInt(CiphertextSize, len(input))]
 
-	// TODO: Accept a proof from `input` too
 	ctHash := crypto.Keccak256Hash(ciphertext)
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ciphertext}
 	return ctHash.Bytes(), nil
@@ -1125,14 +1123,18 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
-	_, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
+	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok {
-		// TODO: Currently, we just sends 1s if the reencryption would have taken place.
-		r := make([]byte, 32)
-		for i := range r {
-			r[i] = 1
-		}
-		return r, nil
+		// We return a memory with a layout that matches the `bytes` Solidity type, namely:
+		//  * 32 byte integer in big-endian order as length
+		//  * the actual bytes in the `bytes` value
+		// TODO: Currently, we just the input without reencryption.
+		len := uint64(len(ct.ciphertext))
+		lenBytes32 := uint256.NewInt(len).Bytes32()
+		ret := make([]byte, 0, len+32)
+		ret = append(ret, lenBytes32[:]...)
+		ret = append(ret, ct.ciphertext...)
+		return ret, nil
 	}
 	return nil, errors.New("unverified ciphertext handle")
 }
