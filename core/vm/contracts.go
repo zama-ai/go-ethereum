@@ -93,7 +93,7 @@ import (
 	"errors"
 	"math/big"
 	"os"
-	"strconv"
+	"strings"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -132,8 +132,6 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
-	common.BytesToAddress([]byte{69}): &fheDecrypt{},
-	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -153,8 +151,6 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
-	common.BytesToAddress([]byte{69}): &fheDecrypt{},
-	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -175,8 +171,6 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
-	common.BytesToAddress([]byte{69}): &fheDecrypt{},
-	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -197,8 +191,6 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
-	common.BytesToAddress([]byte{69}): &fheDecrypt{},
-	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -219,8 +211,6 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
-	common.BytesToAddress([]byte{69}): &fheDecrypt{},
-	common.BytesToAddress([]byte{70}): &fheEncrypt{},
 }
 
 var (
@@ -1162,6 +1152,18 @@ func (c *bls12381MapG2) Run(accessibleState PrecompileAccessibleState, caller co
 	return g.EncodePoint(r), nil
 }
 
+var networkKeysDir string
+var usersKeysDir string
+
+func init() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic("cannot get home directory")
+	}
+	networkKeysDir = home + "/network-fhe-keys/"
+	usersKeysDir = home + "/users-fhe-keys/"
+}
+
 type fheAdd struct{}
 
 func (e *fheAdd) RequiredGas(input []byte) uint64 {
@@ -1171,7 +1173,7 @@ func (e *fheAdd) RequiredGas(input []byte) uint64 {
 
 func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	if len(input) != 64 {
-		return nil, errors.New("Input needs to contain two 256-bit sized values")
+		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
 	verifiedCiphertext1, exists := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input[0:32])]
@@ -1183,7 +1185,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
-	binary_sks, err := os.ReadFile("/path/to/go-ethereum/core/vm/keys/sks")
+	sks, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
 		return nil, err
 	}
@@ -1200,10 +1202,10 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		length:  (C.ulong)(len(verifiedCiphertext2.ciphertext)),
 	}
 
-	cServerKey := C.CBytes(binary_sks)
+	cServerKey := C.CBytes(sks)
 	viewServerKey := C.BufferView{
 		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(binary_sks)),
+		length:  (C.ulong)(len(sks)),
 	}
 
 	result := &C.Buffer{}
@@ -1230,105 +1232,70 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-type fheDecrypt struct{}
-
-func (e *fheDecrypt) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
-}
-
-func (e *fheDecrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
-	if len(input) != 32 {
-		return nil, errors.New("Input needs to contain one 256-bit sized value")
-	}
-
-	verifiedCiphertext1, exists := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input[0:32])]
-	if !exists {
-		return nil, errors.New("unverified ciphertext handle")
-	}
-
-	binary_cks, err := os.ReadFile("/path/to/go-ethereum/core/vm/keys/cks")
+func fheDecrypt(input []byte) (ret uint64, err error) {
+	cks, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	cCiphertext1 := C.CBytes(verifiedCiphertext1.ciphertext)
-	viewCiphertext1 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext1),
-		length:  (C.ulong)(len(verifiedCiphertext1.ciphertext)),
+	ciphertext := C.CBytes(input)
+	viewCiphertext := C.BufferView{
+		pointer: (*C.uchar)(ciphertext),
+		length:  (C.ulong)(len(input)),
 	}
 
-	cServerKey := C.CBytes(binary_cks)
+	cServerKey := C.CBytes(cks)
 	viewServerKey := C.BufferView{
 		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(binary_cks)),
+		length:  (C.ulong)(len(cks)),
 	}
 
-	// we need all those conversions because the precompiled contract
-	// must return a byte array
-	decryted_value := C.decrypt_integer(viewServerKey, viewCiphertext1)
+	decryted_value := C.decrypt_integer(viewServerKey, viewCiphertext)
 	decryted_value_bytes := uint256.NewInt(uint64(decryted_value)).Bytes()
 
+	// TODO: for testing
 	err = os.WriteFile("/tmp/decryption_result", decryted_value_bytes, 0644)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	C.free(cServerKey)
-	C.free(cCiphertext1)
+	C.free(ciphertext)
 
-	return decryted_value_bytes, nil
+	return uint64(decryted_value), nil
 }
 
-type fheEncrypt struct{}
-
-func (e *fheEncrypt) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
-}
-
-func (e *fheEncrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
-
-	value, err := strconv.ParseInt(common.Bytes2Hex(input), 16, 64)
-	if err != nil {
-		return nil, errors.New("error during conversion from smart contract input to uint")
+func fheEncrypt(value uint64, userAddress common.Address) (ret []byte, err error) {
+	if value > 15 {
+		return nil, errors.New("input must be less than 15")
 	}
 
-	if (value) < 0 {
-		return nil, errors.New("input must be greater than 0")
-	}
-
-	binary_cks, err := os.ReadFile("/path/to/go-ethereum/core/vm/keys/cks")
+	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
+	cks, err := os.ReadFile(userPublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cServerKey := C.CBytes(binary_cks)
+	cServerKey := C.CBytes(cks)
 	viewServerKey := C.BufferView{
 		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(binary_cks)),
+		length:  (C.ulong)(len(cks)),
 	}
 
 	result := &C.Buffer{}
 	C.encrypt_integer(viewServerKey, C.ulong(value), result)
 
 	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: ctBytes,
-	}
 
+	// TODO: for testing
 	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
-
 	C.free(cServerKey)
 
-	return ctHash[:], nil
+	return ctBytes, nil
 }
 
 type verifyCiphertext struct{}
@@ -1362,16 +1329,23 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		return nil, errors.New("invalid ciphertext handle")
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
-	if ok {
+	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
 		// We return a memory with a layout that matches the `bytes` Solidity type, namely:
 		//  * 32 byte integer in big-endian order as length
 		//  * the actual bytes in the `bytes` value
-		// TODO: Currently, we just the input without reencryption.
-		len := uint64(len(ct.ciphertext))
+		decryptedValue, err := fheDecrypt(ct.ciphertext)
+		if err != nil {
+			return nil, err
+		}
+		reencryptedValue, err := fheEncrypt(decryptedValue, accessibleState.Interpreter().evm.Origin)
+		if err != nil {
+			return nil, err
+		}
+		len := uint64(len(reencryptedValue))
 		lenBytes32 := uint256.NewInt(len).Bytes32()
 		ret := make([]byte, 0, len+32)
 		ret = append(ret, lenBytes32[:]...)
-		ret = append(ret, ct.ciphertext...)
+		ret = append(ret, reencryptedValue...)
 		return ret, nil
 	}
 	return nil, errors.New("unverified ciphertext handle")
