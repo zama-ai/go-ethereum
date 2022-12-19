@@ -132,6 +132,8 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &require{},
+	common.BytesToAddress([]byte{70}): &fheLte{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -151,6 +153,8 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &require{},
+	common.BytesToAddress([]byte{70}): &fheLte{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -171,6 +175,8 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &require{},
+	common.BytesToAddress([]byte{70}): &fheLte{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -191,6 +197,8 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &require{},
+	common.BytesToAddress([]byte{70}): &fheLte{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -211,6 +219,8 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	common.BytesToAddress([]byte{69}): &require{},
+	common.BytesToAddress([]byte{70}): &fheLte{},
 }
 
 var (
@@ -1164,6 +1174,14 @@ func init() {
 	usersKeysDir = home + "/users-fhe-keys/"
 }
 
+func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) ([]byte, bool) {
+	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[ciphertextHash]
+	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
+		return ct.ciphertext, true
+	}
+	return nil, false
+}
+
 type fheAdd struct{}
 
 func (e *fheAdd) RequiredGas(input []byte) uint64 {
@@ -1171,16 +1189,16 @@ func (e *fheAdd) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	verifiedCiphertext1, exists := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input[0:32])]
+	verifiedCiphertext1, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	verifiedCiphertext2, exists := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input[32:64])]
+	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
 	}
@@ -1190,16 +1208,16 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, err
 	}
 
-	cCiphertext1 := C.CBytes(verifiedCiphertext1.ciphertext)
+	cCiphertext1 := C.CBytes(verifiedCiphertext1)
 	viewCiphertext1 := C.BufferView{
 		pointer: (*C.uchar)(cCiphertext1),
-		length:  (C.ulong)(len(verifiedCiphertext1.ciphertext)),
+		length:  (C.ulong)(len(verifiedCiphertext1)),
 	}
 
-	cCiphertext2 := C.CBytes(verifiedCiphertext2.ciphertext)
+	cCiphertext2 := C.CBytes(verifiedCiphertext2)
 	viewCiphertext2 := C.BufferView{
 		pointer: (*C.uchar)(cCiphertext2),
-		length:  (C.ulong)(len(verifiedCiphertext2.ciphertext)),
+		length:  (C.ulong)(len(verifiedCiphertext2)),
 	}
 
 	cServerKey := C.CBytes(sks)
@@ -1232,7 +1250,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func fheDecrypt(input []byte) (ret uint64, err error) {
+func fheDecrypt(input []byte) (uint64, error) {
 	cks, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
 		return 0, err
@@ -1265,13 +1283,46 @@ func fheDecrypt(input []byte) (ret uint64, err error) {
 	return uint64(decryted_value), nil
 }
 
-func fheEncrypt(value uint64, userAddress common.Address) (ret []byte, err error) {
+func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, error) {
 	if value > 15 {
 		return nil, errors.New("input must be less than 15")
 	}
 
 	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
 	cks, err := os.ReadFile(userPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	cServerKey := C.CBytes(cks)
+	viewServerKey := C.BufferView{
+		pointer: (*C.uchar)(cServerKey),
+		length:  (C.ulong)(len(cks)),
+	}
+
+	result := &C.Buffer{}
+	C.encrypt_integer(viewServerKey, C.ulong(value), result)
+
+	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	C.free(cServerKey)
+
+	return ctBytes, nil
+}
+
+func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
+	if value > 15 {
+		return nil, errors.New("input must be less than 15")
+	}
+
+	networkKey := strings.ToLower(networkKeysDir + "cks")
+	cks, err := os.ReadFile(networkKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1317,6 +1368,18 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	return ctHash.Bytes(), nil
 }
 
+// Return a memory with a layout that matches the `bytes` EVM type, namely:
+//  * 32 byte integer in big-endian order as length
+//  * the actual bytes in the `bytes` value
+func toEVMBytes(input []byte) (ret []byte) {
+	len := uint64(len(input))
+	lenBytes32 := uint256.NewInt(len).Bytes32()
+	ret = make([]byte, 0, len+32)
+	ret = append(ret, lenBytes32[:]...)
+	ret = append(ret, input...)
+	return
+}
+
 type reencrypt struct{}
 
 func (e *reencrypt) RequiredGas(input []byte) uint64 {
@@ -1324,29 +1387,21 @@ func (e *reencrypt) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
-		// We return a memory with a layout that matches the `bytes` Solidity type, namely:
-		//  * 32 byte integer in big-endian order as length
-		//  * the actual bytes in the `bytes` value
 		decryptedValue, err := fheDecrypt(ct.ciphertext)
 		if err != nil {
 			return nil, err
 		}
-		reencryptedValue, err := fheEncrypt(decryptedValue, accessibleState.Interpreter().evm.Origin)
+		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
 		if err != nil {
 			return nil, err
 		}
-		len := uint64(len(reencryptedValue))
-		lenBytes32 := uint256.NewInt(len).Bytes32()
-		ret := make([]byte, 0, len+32)
-		ret = append(ret, lenBytes32[:]...)
-		ret = append(ret, reencryptedValue...)
-		return ret, nil
+		return toEVMBytes(reencryptedValue), nil
 	}
 	return nil, errors.New("unverified ciphertext handle")
 }
@@ -1358,7 +1413,7 @@ func (e *delegateCiphertext) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
@@ -1368,4 +1423,78 @@ func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, call
 		return nil, nil
 	}
 	return nil, errors.New("unverified ciphertext handle")
+}
+
+type require struct{}
+
+func (e *require) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if len(input) != 32 {
+		return nil, errors.New("invalid ciphertext handle")
+	}
+	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
+	if !ok {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+	requireValue, err := fheDecrypt(ct.ciphertext)
+	if err != nil {
+		return nil, err
+	}
+	if requireValue == 0 {
+		return nil, errors.New("require value of 0")
+	}
+	return nil, nil
+}
+
+type fheLte struct{}
+
+func (e *fheLte) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if len(input) != 64 {
+		return nil, errors.New("input needs to contain two 256-bit sized values")
+	}
+
+	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if !exists {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if !exists {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+
+	// TODO: decrypt inputs till we support the FHE LTE operator
+	lhs, err := fheDecrypt(lhsCt)
+	if err != nil {
+		return nil, err
+	}
+	rhs, err := fheDecrypt(rhsCt)
+	if err != nil {
+		return nil, err
+	}
+	var result uint64
+	if lhs <= rhs {
+		result = 1
+	} else {
+		result = 0
+	}
+	ct, err := fheEncryptToNetworkKey(result)
+	if err != nil {
+		return nil, err
+	}
+	verifiedCiphertext := &verifiedCiphertext{
+		depth:      accessibleState.Interpreter().evm.depth,
+		ciphertext: ct,
+	}
+	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
+	return ctHash[:], nil
 }
