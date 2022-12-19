@@ -84,6 +84,28 @@ uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
 	return res;
 }
 
+void public_encrypt_integer(BufferView pks_buff_view,BufferView sks_buff_view, uint64_t val, Buffer* ct_buf)
+{
+	ShortintCiphertext *ct = NULL;
+	ShortintPublicKey *pks = NULL;
+	ShortintServerKey *sks = NULL;
+
+	int deser_ok = shortint_deserialize_public_key(pks_buff_view, &pks);
+	assert(deser_ok == 0);
+	deser_ok = shortint_deserialize_server_key(sks_buff_view, &sks);
+	assert(deser_ok == 0);
+
+	int encrypt_ok = shortint_public_key_encrypt(pks, sks, val, &ct);
+  	assert(encrypt_ok == 0);
+
+	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
+	assert(ser_ok == 0);
+
+	destroy_shortint_public_key(pks);
+	destroy_shortint_server_key(sks);
+	destroy_shortint_ciphertext(ct);
+}
+
 */
 import "C"
 
@@ -1316,30 +1338,41 @@ func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, erro
 	return ctBytes, nil
 }
 
-func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
+func fhePublicEncrypt(value uint64, userAddress common.Address) (ret []byte, err error) {
 	if value > 15 {
 		return nil, errors.New("input must be less than 15")
 	}
 
-	networkKey := strings.ToLower(networkKeysDir + "cks")
-	cks, err := os.ReadFile(networkKey)
+	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
+	pks, err := os.ReadFile(userPublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	cServerKey := C.CBytes(cks)
+	cPublicKey := C.CBytes(pks)
+	viewPublicKey := C.BufferView{
+		pointer: (*C.uchar)(cPublicKey),
+		length:  (C.ulong)(len(pks)),
+	}
+
+	sks, err := os.ReadFile(networkKeysDir + "sks")
+	if err != nil {
+		return nil, err
+	}
+
+	cServerKey := C.CBytes(sks)
 	viewServerKey := C.BufferView{
 		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(cks)),
+		length:  (C.ulong)(len(sks)),
 	}
 
 	result := &C.Buffer{}
-	C.encrypt_integer(viewServerKey, C.ulong(value), result)
+	C.public_encrypt_integer(viewPublicKey, viewServerKey, C.ulong(value), result)
 
 	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
+	err = os.WriteFile("/tmp/public_encrypt_result", ctBytes, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1397,7 +1430,11 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		if err != nil {
 			return nil, err
 		}
+<<<<<<< HEAD
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
+=======
+		reencryptedValue, err := fhePublicEncrypt(decryptedValue, accessibleState.Interpreter().evm.Origin)
+>>>>>>> 71c7c9d3a (feature(reencypt): add public fhe encryption)
 		if err != nil {
 			return nil, err
 		}
