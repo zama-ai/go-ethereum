@@ -88,10 +88,15 @@ uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
 import "C"
 
 import (
+	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
 	"unsafe"
@@ -104,6 +109,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+	"github.com/naoina/toml"
+	"github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -1165,13 +1172,80 @@ func (c *bls12381MapG2) Run(accessibleState PrecompileAccessibleState, caller co
 var networkKeysDir string
 var usersKeysDir string
 
-func init() {
+type tomlConfigOptions struct {
+	Oracle struct {
+		Mode            string
+		OracleDBAddress string
+	}
+}
+
+var tomlConfig tomlConfigOptions
+
+func homeDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		panic("cannot get home directory")
+		panic(err)
 	}
-	networkKeysDir = home + "/network-fhe-keys/"
-	usersKeysDir = home + "/users-fhe-keys/"
+	return home
+}
+
+func generateEd25519Keys() error {
+	public, private, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		return err
+	}
+	home := homeDir()
+	if err := os.WriteFile(home+"/.evmosd/zama/keys/signature-keys/public.ed25519", public, 0600); err != nil {
+		return err
+	}
+	if err := os.WriteFile(home+"/.evmosd/zama/keys/signature-keys/private.ed25519", private, 0600); err != nil {
+		return err
+	}
+	return nil
+}
+
+var httpClient http.Client = http.Client{}
+
+var publicSignatureKey []byte
+var privateSignatureKey []byte
+
+func signRequire(ciphertext []byte, value bool) string {
+	// TODO: avoid copy
+	input := make([]byte, 0, len(ciphertext)+1)
+	input = append(input, ciphertext...)
+	if value {
+		input = append(input, 1)
+	} else {
+		input = append(input, 0)
+	}
+	signature := ed25519.Sign(privateSignatureKey, input)
+	return hex.EncodeToString(signature)
+}
+
+func init() {
+	home := homeDir()
+	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
+	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
+
+	f, err := os.Open(home + "/.evmosd/zama/config/zama_config.toml")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if err := toml.NewDecoder(f).Decode(&tomlConfig); err != nil {
+		return
+	}
+
+	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
+	case "oracle":
+		pk, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
+		if err != nil {
+			return
+		}
+		privateSignatureKey = pk
+	default:
+		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
+	}
 }
 
 func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) ([]byte, bool) {
@@ -1432,6 +1506,36 @@ func (e *require) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
+type requireMessage struct {
+	Value     bool   `json:"value"`
+	Signature string `json:"signature"`
+}
+
+func requireKey(ciphertext []byte) string {
+	// Take the Keccak256 and remove the leading 0x.
+	return crypto.Keccak256Hash(ciphertext).Hex()[2:]
+}
+
+func putRequire(ciphertext []byte, value bool) error {
+	key := requireKey(ciphertext)
+	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPut, tomlConfig.Oracle.OracleDBAddress+"/require/"+key, bytes.NewReader(j))
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return errors.New(fmt.Sprintf("failure HTTP status code: %d", resp.StatusCode))
+	}
+	return nil
+}
+
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
@@ -1440,14 +1544,21 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	if !ok {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	requireValue, err := fheDecrypt(ct.ciphertext)
-	if err != nil {
-		return nil, err
+	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
+	case "oracle":
+		requireValue, err := fheDecrypt(ct.ciphertext)
+		if err != nil {
+			return nil, err
+		}
+		if err := putRequire(ct.ciphertext, requireValue != 0); err != nil {
+			return nil, err
+		}
+		if requireValue == 0 {
+			return nil, errors.New("require value of 0")
+		}
+		return nil, nil
 	}
-	if requireValue == 0 {
-		return nil, errors.New("require value of 0")
-	}
-	return nil, nil
+	return nil, errors.New("unimplemented require mode")
 }
 
 type fheLte struct{}
