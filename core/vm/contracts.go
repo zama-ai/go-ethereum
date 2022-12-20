@@ -1301,13 +1301,13 @@ func fheDecrypt(input []byte) (uint64, error) {
 	return uint64(decryted_value), nil
 }
 
-func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, error) {
+func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	if value > 15 {
 		return nil, errors.New("input must be less than 15")
 	}
 
-	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
-	cks, err := os.ReadFile(userPublicKey)
+	networkKey := strings.ToLower(networkKeysDir + "cks")
+	cks, err := os.ReadFile(networkKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1334,7 +1334,7 @@ func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, erro
 	return ctBytes, nil
 }
 
-func fhePublicEncrypt(value uint64, userAddress common.Address) (ret []byte, err error) {
+func fheEncryptToUserKey(value uint64, userAddress common.Address) (ret []byte, err error) {
 	if value > 15 {
 		return nil, errors.New("input must be less than 15")
 	}
@@ -1415,11 +1415,7 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		if err != nil {
 			return nil, err
 		}
-<<<<<<< HEAD
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
-=======
-		reencryptedValue, err := fhePublicEncrypt(decryptedValue, accessibleState.Interpreter().evm.Origin)
->>>>>>> 71c7c9d3a (feature(reencypt): add public fhe encryption)
 		if err != nil {
 			return nil, err
 		}
