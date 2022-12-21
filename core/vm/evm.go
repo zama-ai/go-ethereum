@@ -124,6 +124,8 @@ type EVM struct {
 
 	/// A flag to denote that execution was triggered by an EthCall RPC.
 	EthCall bool
+	/// A flag to denote that execution was triggered by an EthEstimateGas RPC.
+	EthEstimateGas bool
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should

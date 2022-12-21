@@ -1326,6 +1326,10 @@ func (e *fheAdd) RequiredGas(input []byte) uint64 {
 }
 
 func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if accessibleState.Interpreter().evm.EthEstimateGas {
+		return nil, errors.New("FHE operations are not computed during gas estimation")
+	}
+
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
@@ -1437,7 +1441,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	}
 
 	result := &C.Buffer{}
-	C.encrypt_integer(viewServerKey, C.ulong(value), result)
+	C.encrypt_integer(viewServerKey, C.ulonglong(value), result)
 
 	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
 
@@ -1470,7 +1474,7 @@ func fheEncryptToUserKey(value uint64, userAddress common.Address) (ret []byte, 
 	}
 
 	result := &C.Buffer{}
-	C.public_encrypt_integer(viewPublicKey, C.ulong(value), result)
+	C.public_encrypt_integer(viewPublicKey, C.ulonglong(value), result)
 
 	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
 
@@ -1505,8 +1509,8 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 }
 
 // Return a memory with a layout that matches the `bytes` EVM type, namely:
-//  * 32 byte integer in big-endian order as length
-//  * the actual bytes in the `bytes` value
+//   - 32 byte integer in big-endian order as length
+//   - the actual bytes in the `bytes` value
 func toEVMBytes(input []byte) (ret []byte) {
 	len := uint64(len(input))
 	lenBytes32 := uint256.NewInt(len).Bytes32()
@@ -1682,6 +1686,10 @@ func (e *fheLte) RequiredGas(input []byte) uint64 {
 }
 
 func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if accessibleState.Interpreter().evm.EthEstimateGas {
+		return nil, errors.New("FHE operations are not computed during gas estimation")
+	}
+
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
@@ -1731,6 +1739,10 @@ func (e *fheSub) RequiredGas(input []byte) uint64 {
 }
 
 func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if accessibleState.Interpreter().evm.EthEstimateGas {
+		return nil, errors.New("FHE operations are not computed during gas estimation")
+	}
+
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
