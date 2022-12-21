@@ -111,8 +111,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net/http"
 	"os"
@@ -128,7 +130,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/naoina/toml"
-	"github.com/tendermint/tendermint/libs/json"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -1227,16 +1228,21 @@ var httpClient http.Client = http.Client{}
 var publicSignatureKey []byte
 var privateSignatureKey []byte
 
-func signRequire(ciphertext []byte, value bool) string {
+func requireBytesToSign(ciphertext []byte, value bool) []byte {
 	// TODO: avoid copy
-	input := make([]byte, 0, len(ciphertext)+1)
-	input = append(input, ciphertext...)
+	b := make([]byte, 0, len(ciphertext)+1)
+	b = append(b, ciphertext...)
 	if value {
-		input = append(input, 1)
+		b = append(b, 1)
 	} else {
-		input = append(input, 0)
+		b = append(b, 0)
 	}
-	signature := ed25519.Sign(privateSignatureKey, input)
+	return b
+}
+
+func signRequire(ciphertext []byte, value bool) string {
+	b := requireBytesToSign(ciphertext, value)
+	signature := ed25519.Sign(privateSignatureKey, b)
 	return hex.EncodeToString(signature)
 }
 
@@ -1256,11 +1262,17 @@ func init() {
 
 	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
 	case "oracle":
-		pk, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
+		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
 			return
 		}
-		privateSignatureKey = pk
+		privateSignatureKey = priv
+	case "node":
+		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
+		if err != nil {
+			return
+		}
+		publicSignatureKey = pub
 	default:
 		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
 	}
@@ -1534,13 +1546,17 @@ func requireKey(ciphertext []byte) string {
 	return crypto.Keccak256Hash(ciphertext).Hex()[2:]
 }
 
+func requireURL(key *string) string {
+	return tomlConfig.Oracle.OracleDBAddress + "/require/" + *key
+}
+
 func putRequire(ciphertext []byte, value bool) error {
 	key := requireKey(ciphertext)
 	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPut, tomlConfig.Oracle.OracleDBAddress+"/require/"+key, bytes.NewReader(j))
+	req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
 	if err != nil {
 		return err
 	}
@@ -1549,9 +1565,41 @@ func putRequire(ciphertext []byte, value bool) error {
 		return err
 	}
 	if resp.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("failure HTTP status code: %d", resp.StatusCode))
+		return fmt.Errorf("failure HTTP status code: %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func getRequire(ciphertext []byte) (bool, error) {
+	key := requireKey(ciphertext)
+	req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
+	if err != nil {
+		return false, nil
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("failure HTTP status code: %d", resp.StatusCode)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, errors.New("failed reading response body")
+	}
+	msg := requireMessage{}
+	if err := json.Unmarshal(body, &msg); err != nil {
+		return false, err
+	}
+	b := requireBytesToSign(ciphertext, msg.Value)
+	s, err := hex.DecodeString(msg.Signature)
+	if err != nil {
+		return false, err
+	}
+	if ed25519.Verify(publicSignatureKey, b, s) {
+		return msg.Value, nil
+	}
+	return false, errors.New("invalid require signature")
 }
 
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1572,6 +1620,15 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 			return nil, err
 		}
 		if requireValue == 0 {
+			return nil, errors.New("require value of 0")
+		}
+		return nil, nil
+	case "node":
+		requireValue, err := getRequire(ct.ciphertext)
+		if err != nil {
+			return nil, err
+		}
+		if !requireValue {
 			return nil, errors.New("require value of 0")
 		}
 		return nil, nil
