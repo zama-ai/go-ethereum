@@ -1524,6 +1524,9 @@ func (e *reencrypt) RequiredGas(input []byte) uint64 {
 }
 
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if !accessibleState.Interpreter().evm.EthCall {
+		return nil, errors.New("reencrypt not supported in write commands")
+	}
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
@@ -1635,6 +1638,9 @@ func getRequire(ciphertext []byte) (bool, error) {
 }
 
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if accessibleState.Interpreter().evm.EthCall {
+		return nil, errors.New("require not supported in read-only commands")
+	}
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
