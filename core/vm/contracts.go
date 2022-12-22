@@ -1752,6 +1752,11 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
+	// If we are not committing state, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit {
+		return importRandomCiphertext(accessibleState, len(lhsCt)), nil
+	}
+
 	sks, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
 		return nil, err
