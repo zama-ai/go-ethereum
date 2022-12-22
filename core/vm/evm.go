@@ -122,10 +122,10 @@ type EVM struct {
 	// applied in opCall*.
 	callGasTemp uint64
 
-	/// A flag to denote that execution was triggered by an EthCall RPC.
+	/// A flag to indicate that execution was triggered by an EthCall RPC.
 	EthCall bool
-	/// A flag to denote that execution was triggered by an EthEstimateGas RPC.
-	EthEstimateGas bool
+	/// A flag to indicate that execution results will be committed.
+	Commit bool
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
