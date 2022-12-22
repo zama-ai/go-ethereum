@@ -135,6 +135,7 @@ import "C"
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -1318,6 +1319,22 @@ func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertext
 	return nil, false
 }
 
+// Used when we want to skip FHE computation, e.g. gas estimation.
+func importRandomCiphertext(accessibleState PrecompileAccessibleState, length int) []byte {
+	randomCt := make([]byte, length)
+	_, err := rand.Read(randomCt)
+	if err != nil {
+		panic("failed to create a random ciphertext")
+	}
+	verifiedCiphertext := &verifiedCiphertext{
+		depth:      accessibleState.Interpreter().evm.depth,
+		ciphertext: randomCt,
+	}
+	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
+	return ctHash[:]
+}
+
 type fheAdd struct{}
 
 func (e *fheAdd) RequiredGas(input []byte) uint64 {
@@ -1326,10 +1343,6 @@ func (e *fheAdd) RequiredGas(input []byte) uint64 {
 }
 
 func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if accessibleState.Interpreter().evm.EthEstimateGas {
-		return nil, errors.New("FHE operations are not computed during gas estimation")
-	}
-
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
@@ -1341,6 +1354,11 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
+	}
+
+	// If we are not committing state, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit {
+		return importRandomCiphertext(accessibleState, len(verifiedCiphertext1)), nil
 	}
 
 	sks, err := os.ReadFile(networkKeysDir + "sks")
@@ -1441,7 +1459,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	}
 
 	result := &C.Buffer{}
-	C.encrypt_integer(viewServerKey, C.ulonglong(value), result)
+	C.encrypt_integer(viewServerKey, C.ulong(value), result)
 
 	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
 
@@ -1474,7 +1492,7 @@ func fheEncryptToUserKey(value uint64, userAddress common.Address) (ret []byte, 
 	}
 
 	result := &C.Buffer{}
-	C.public_encrypt_integer(viewPublicKey, C.ulonglong(value), result)
+	C.public_encrypt_integer(viewPublicKey, C.ulong(value), result)
 
 	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
 
@@ -1648,6 +1666,11 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
+	// If we are not committing to state, assume the require is true, avoiding any side effects
+	// (i.e. mutatiting the oracle DB).
+	if !accessibleState.Interpreter().evm.Commit {
+		return nil, nil
+	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if !ok {
 		return nil, errors.New("unverified ciphertext handle")
@@ -1686,10 +1709,6 @@ func (e *fheLte) RequiredGas(input []byte) uint64 {
 }
 
 func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if accessibleState.Interpreter().evm.EthEstimateGas {
-		return nil, errors.New("FHE operations are not computed during gas estimation")
-	}
-
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
@@ -1701,6 +1720,11 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
+	}
+
+	// If we are not committing state, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit {
+		return importRandomCiphertext(accessibleState, len(lhsCt)), nil
 	}
 
 	// TODO: decrypt inputs till we support the FHE LTE operator
@@ -1739,10 +1763,6 @@ func (e *fheSub) RequiredGas(input []byte) uint64 {
 }
 
 func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if accessibleState.Interpreter().evm.EthEstimateGas {
-		return nil, errors.New("FHE operations are not computed during gas estimation")
-	}
-
 	if len(input) != 64 {
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
@@ -1754,6 +1774,11 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
+	}
+
+	// If we are not committing state, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit {
+		return importRandomCiphertext(accessibleState, len(verifiedCiphertext1)), nil
 	}
 
 	sks, err := os.ReadFile(networkKeysDir + "sks")
