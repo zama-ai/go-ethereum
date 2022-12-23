@@ -78,6 +78,35 @@ void sub_encrypted_integers(BufferView sks_view, BufferView ct1_view, BufferView
 	destroy_shortint_ciphertext(result_ct);
 }
 
+void less_or_equal(BufferView sks_view, BufferView ct1_view, BufferView ct2_view, Buffer* result)
+{
+	ShortintServerKey *sks = NULL;
+	ShortintCiphertext *ct1 = NULL;
+	ShortintCiphertext *ct2 = NULL;
+	ShortintCiphertext *result_ct = NULL;
+
+	int deser_sks_ok = shortint_deserialize_server_key(sks_view, &sks);
+	assert(deser_sks_ok == 0);
+
+	int deser_ct1_ok = shortint_deserialize_ciphertext(ct1_view, &ct1);
+	assert(deser_ct1_ok == 0);
+
+	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
+	assert(deser_ct2_ok == 0);
+
+	int comp_ok = shortint_server_key_smart_less_or_equal(sks, ct1, ct2, &result_ct);
+	assert(comp_ok == 0);
+
+	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
+	assert(ser_ok == 0);
+
+	destroy_shortint_server_key(sks);
+	destroy_shortint_ciphertext(ct1);
+	destroy_shortint_ciphertext(ct2);
+	destroy_shortint_ciphertext(result_ct);
+}
+
+
 void encrypt_integer(BufferView cks_buff_view, uint64_t val, Buffer* ct_buf)
 {
 	ShortintCiphertext *ct = NULL;
@@ -1727,31 +1756,50 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState, len(lhsCt)), nil
 	}
 
-	// TODO: decrypt inputs till we support the FHE LTE operator
-	lhs, err := fheDecrypt(lhsCt)
+	sks, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
 		return nil, err
 	}
-	rhs, err := fheDecrypt(rhsCt)
-	if err != nil {
-		return nil, err
+
+	cCiphertext1 := C.CBytes(lhsCt)
+	viewCiphertext1 := C.BufferView{
+		pointer: (*C.uchar)(cCiphertext1),
+		length:  (C.ulong)(len(lhsCt)),
 	}
-	var result uint64
-	if lhs <= rhs {
-		result = 1
-	} else {
-		result = 0
+
+	cCiphertext2 := C.CBytes(rhsCt)
+	viewCiphertext2 := C.BufferView{
+		pointer: (*C.uchar)(cCiphertext2),
+		length:  (C.ulong)(len(rhsCt)),
 	}
-	ct, err := fheEncryptToNetworkKey(result)
-	if err != nil {
-		return nil, err
+
+	cServerKey := C.CBytes(sks)
+	viewServerKey := C.BufferView{
+		pointer: (*C.uchar)(cServerKey),
+		length:  (C.ulong)(len(sks)),
 	}
+
+	result := &C.Buffer{}
+	C.less_or_equal(viewServerKey, viewCiphertext1, viewCiphertext2, result)
+
+	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: ct,
+		ciphertext: ctBytes,
 	}
+
+	err = os.WriteFile("/tmp/lte_result", ctBytes, 0644)
+	if err != nil {
+		return nil, err
+	}
+
 	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
+
+	C.free(cServerKey)
+	C.free(cCiphertext1)
+	C.free(cCiphertext2)
+
 	return ctHash[:], nil
 }
 
