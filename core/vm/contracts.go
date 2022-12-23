@@ -94,8 +94,7 @@ void less_or_equal(BufferView sks_view, BufferView ct1_view, BufferView ct2_view
 	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
 	assert(deser_ct2_ok == 0);
 
-	// int comp_ok = shortint_server_key_smart_less_or_equal(sks, ct1, ct2, &result_ct);
-	int comp_ok = shortint_server_key_unchecked_less_or_equal(sks, ct1, ct2, &result_ct);
+	int comp_ok = shortint_server_key_smart_less_or_equal(sks, ct1, ct2, &result_ct);
 	assert(comp_ok == 0);
 
 	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
