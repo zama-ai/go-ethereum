@@ -1258,6 +1258,11 @@ type tomlConfigOptions struct {
 		Mode            string
 		OracleDBAddress string
 	}
+
+	Zk struct {
+		Verify           bool
+		VerifyRPCAddress string
+	}
 }
 
 var tomlConfig tomlConfigOptions
@@ -1285,7 +1290,8 @@ func generateEd25519Keys() error {
 	return nil
 }
 
-var httpClient http.Client = http.Client{}
+var requireHttpClient http.Client = http.Client{}
+var zkHttpClient http.Client = http.Client{}
 
 var publicSignatureKey []byte
 var privateSignatureKey []byte
@@ -1503,7 +1509,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	return ctBytes, nil
 }
 
-func fheEncryptToUserKey(value uint64, userAddress common.Address) (ret []byte, err error) {
+func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, error) {
 	if value > 15 {
 		return nil, errors.New("input must be less than 15")
 	}
@@ -1543,13 +1549,39 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error) {
-	const CiphertextSize = 65544
+func verifyZkProof(input []byte) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodPost, tomlConfig.Zk.VerifyRPCAddress, bytes.NewReader(input))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/msgpack")
+	resp, err := zkHttpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failure HTTP status code on ZK verify: %d", resp.StatusCode)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.New("failed reading ZK verification response body")
+	}
+	return body, nil
+}
 
-	// TODO: Verify proof.
-	// For testing: If input size <= `CiphertextSize`, treat the whole input as ciphertext.
-	ciphertext := input[0:minInt(CiphertextSize, len(input))]
-
+func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	var ciphertext []byte
+	if !tomlConfig.Zk.Verify {
+		// For testing: If input size <= `CiphertextSize`, treat the whole input as ciphertext.
+		const CiphertextSize = 65544
+		ciphertext = input[0:minInt(CiphertextSize, len(input))]
+	} else {
+		var err error
+		ciphertext, err = verifyZkProof(input)
+		if err != nil {
+			return nil, err
+		}
+	}
 	ctHash := crypto.Keccak256Hash(ciphertext)
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ciphertext}
 	return ctHash.Bytes(), nil
@@ -1558,13 +1590,13 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 // Return a memory with a layout that matches the `bytes` EVM type, namely:
 //   - 32 byte integer in big-endian order as length
 //   - the actual bytes in the `bytes` value
-func toEVMBytes(input []byte) (ret []byte) {
+func toEVMBytes(input []byte) []byte {
 	len := uint64(len(input))
 	lenBytes32 := uint256.NewInt(len).Bytes32()
-	ret = make([]byte, 0, len+32)
+	ret := make([]byte, 0, len+32)
 	ret = append(ret, lenBytes32[:]...)
 	ret = append(ret, input...)
-	return
+	return ret
 }
 
 type reencrypt struct{}
@@ -1646,12 +1678,12 @@ func putRequire(ciphertext []byte, value bool) error {
 	if err != nil {
 		return err
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := requireHttpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("failure HTTP status code: %d", resp.StatusCode)
+		return fmt.Errorf("failure HTTP status code on require PUT: %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -1662,12 +1694,12 @@ func getRequire(ciphertext []byte) (bool, error) {
 	if err != nil {
 		return false, nil
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := requireHttpClient.Do(req)
 	if err != nil {
 		return false, err
 	}
 	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("failure HTTP status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("require: failure HTTP status code on require GET: %d", resp.StatusCode)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
