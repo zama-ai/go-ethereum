@@ -38,7 +38,7 @@ void add_encrypted_integers(BufferView sks_view, BufferView ct1_view, BufferView
 	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
 	assert(deser_ct2_ok == 0);
 
-	int add_ok = shortint_server_key_smart_add(sks, ct1, ct2, &result_ct);
+	int add_ok = shortint_bc_server_key_smart_add(sks, ct1, ct2, &result_ct);
 	assert(add_ok == 0);
 
 	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
@@ -66,7 +66,7 @@ void sub_encrypted_integers(BufferView sks_view, BufferView ct1_view, BufferView
 	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
 	assert(deser_ct2_ok == 0);
 
-	int add_ok = shortint_server_key_smart_sub(sks, ct1, ct2, &result_ct);
+	int add_ok = shortint_bc_server_key_smart_sub(sks, ct1, ct2, &result_ct);
 	assert(add_ok == 0);
 
 	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
@@ -94,7 +94,7 @@ void less_or_equal(BufferView sks_view, BufferView ct1_view, BufferView ct2_view
 	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
 	assert(deser_ct2_ok == 0);
 
-	int comp_ok = shortint_server_key_smart_less_or_equal(sks, ct1, ct2, &result_ct);
+	int comp_ok = shortint_bc_server_key_smart_less_or_equal(sks, ct1, ct2, &result_ct);
 	assert(comp_ok == 0);
 
 	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
@@ -115,7 +115,7 @@ void encrypt_integer(BufferView cks_buff_view, uint64_t val, Buffer* ct_buf)
 	int deser_ok = shortint_deserialize_client_key(cks_buff_view, &cks);
 	assert(deser_ok == 0);
 
-	int encrypt_ok = shortint_client_key_encrypt(cks, val, &ct);
+	int encrypt_ok = shortint_bc_client_key_encrypt(cks, val, &ct);
 	assert(encrypt_ok == 0);
 
 	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
@@ -134,7 +134,7 @@ uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
 	int ct_deser_ok = shortint_deserialize_ciphertext(ct_buf_view, &ct);
 	assert(ct_deser_ok == 0);
 
-	int ct_decrypt = shortint_client_key_decrypt(cks, ct, &res);
+	int ct_decrypt = shortint_bc_client_key_decrypt(cks, ct, &res);
 	assert(ct_decrypt == 0);
 
 	return res;
@@ -148,7 +148,7 @@ void public_encrypt_integer(BufferView pks_buff_view, uint64_t val, Buffer* ct_b
 	int deser_ok = shortint_deserialize_public_key(pks_buff_view, &pks);
 	assert(deser_ok == 0);
 
-	int encrypt_ok = shortint_public_key_encrypt(pks, val, &ct);
+	int encrypt_ok = shortint_bc_public_key_encrypt(pks, val, &ct);
   	assert(encrypt_ok == 0);
 
 	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
