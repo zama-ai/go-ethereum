@@ -1569,13 +1569,18 @@ func verifyZkProof(input []byte) ([]byte, error) {
 	return body, nil
 }
 
+const ciphertextSize = 7008
+
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	var ciphertext []byte
 	if !tomlConfig.Zk.Verify {
-		// For testing: If input size <= `CiphertextSize`, treat the whole input as ciphertext.
-		const CiphertextSize = 65544
-		ciphertext = input[0:minInt(CiphertextSize, len(input))]
+		// For testing: If input size <= `ciphertextSize`, treat the whole input as ciphertext.
+		ciphertext = input[0:minInt(ciphertextSize, len(input))]
 	} else {
+		// If we are not committing state, skip verificaton and insert a random ciphertext as a result.
+		if !accessibleState.Interpreter().evm.Commit {
+			return importRandomCiphertext(accessibleState, ciphertextSize), nil
+		}
 		var err error
 		ciphertext, err = verifyZkProof(input)
 		if err != nil {
