@@ -1446,6 +1446,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 func fheDecrypt(input []byte) (uint64, error) {
 	cks, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
+		logToFile("no FHE network key\n")
 		return 0, err
 	}
 
@@ -1467,6 +1468,7 @@ func fheDecrypt(input []byte) (uint64, error) {
 	// TODO: for testing
 	err = os.WriteFile("/tmp/decryption_result", decryted_value_bytes, 0644)
 	if err != nil {
+		logToFile("failed to write tmp result\n")
 		return 0, err
 	}
 
@@ -1478,12 +1480,14 @@ func fheDecrypt(input []byte) (uint64, error) {
 
 func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	if value > 15 {
+		logToFile("invalid value to encrypt\n")
 		return nil, errors.New("input must be less than 15")
 	}
 
 	networkKey := strings.ToLower(networkKeysDir + "cks")
 	cks, err := os.ReadFile(networkKey)
 	if err != nil {
+		logToFile("failed to read user key\n")
 		return nil, err
 	}
 
@@ -1501,6 +1505,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	// TODO: for testing
 	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
 	if err != nil {
+		logToFile("failed to write encrypt result\n")
 		return nil, err
 	}
 
@@ -1611,25 +1616,46 @@ func (e *reencrypt) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
+var fileLog *os.File
+
+func init() {
+	var e error
+	fileLog, e = os.OpenFile("/tmp/go-eth.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if e != nil {
+		panic(e)
+	}
+}
+
+func logToFile(s string) {
+	fileLog.WriteString(s)
+	fileLog.Sync()
+}
+
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if !accessibleState.Interpreter().evm.EthCall {
+		logToFile("Not an EthCall\n")
 		return nil, errors.New("reencrypt not supported in write commands")
 	}
 	if len(input) != 32 {
+		logToFile("Invalid input len\n")
 		return nil, errors.New("invalid ciphertext handle")
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
 		decryptedValue, err := fheDecrypt(ct.ciphertext)
+		logToFile("fheDecrypt failed\n")
 		if err != nil {
+			logToFile("fheDecrypt failed\n")
 			return nil, err
 		}
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
 		if err != nil {
+			logToFile("fheEncryptToUserKey failed\n")
 			return nil, err
 		}
 		return toEVMBytes(reencryptedValue), nil
 	}
+	logToFile("Unverified ciphertext handle\n")
 	return nil, errors.New("unverified ciphertext handle")
 }
 
