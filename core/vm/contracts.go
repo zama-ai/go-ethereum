@@ -1584,15 +1584,18 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	} else {
 		// If we are not committing state, skip verificaton and insert a random ciphertext as a result.
 		if !accessibleState.Interpreter().evm.Commit {
+			logToFile("verify on gas estimation\n")
 			return importRandomCiphertext(accessibleState, ciphertextSize), nil
 		}
 		var err error
 		ciphertext, err = verifyZkProof(input)
 		if err != nil {
+			logToFile("verify ZK proof failed\n")
 			return nil, err
 		}
 	}
 	ctHash := crypto.Keccak256Hash(ciphertext)
+	logToFile("verify hash: " + ctHash.Hex() + "\n")
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ciphertext}
 	return ctHash.Bytes(), nil
 }
@@ -1624,6 +1627,8 @@ func init() {
 	if e != nil {
 		panic(e)
 	}
+
+	logToFile("START\n")
 }
 
 func logToFile(s string) {
@@ -1640,6 +1645,7 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		logToFile("Invalid input len\n")
 		return nil, errors.New("invalid ciphertext handle")
 	}
+	logToFile("reencrypt input: " + common.BytesToHash(input).Hex() + "\n")
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
 		decryptedValue, err := fheDecrypt(ct.ciphertext)
