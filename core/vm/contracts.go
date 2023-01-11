@@ -1446,7 +1446,6 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 func fheDecrypt(input []byte) (uint64, error) {
 	cks, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
-		logToFile("no FHE network key\n")
 		return 0, err
 	}
 
@@ -1468,7 +1467,6 @@ func fheDecrypt(input []byte) (uint64, error) {
 	// TODO: for testing
 	err = os.WriteFile("/tmp/decryption_result", decryted_value_bytes, 0644)
 	if err != nil {
-		logToFile("failed to write tmp result\n")
 		return 0, err
 	}
 
@@ -1479,15 +1477,9 @@ func fheDecrypt(input []byte) (uint64, error) {
 }
 
 func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
-	if value > 15 {
-		logToFile("invalid value to encrypt\n")
-		return nil, errors.New("input must be less than 15")
-	}
-
 	networkKey := strings.ToLower(networkKeysDir + "cks")
 	cks, err := os.ReadFile(networkKey)
 	if err != nil {
-		logToFile("failed to read user key\n")
 		return nil, err
 	}
 
@@ -1505,7 +1497,6 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	// TODO: for testing
 	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
 	if err != nil {
-		logToFile("failed to write encrypt result\n")
 		return nil, err
 	}
 
@@ -1584,18 +1575,15 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	} else {
 		// If we are not committing state, skip verificaton and insert a random ciphertext as a result.
 		if !accessibleState.Interpreter().evm.Commit {
-			logToFile("verify on gas estimation\n")
 			return importRandomCiphertext(accessibleState, ciphertextSize), nil
 		}
 		var err error
 		ciphertext, err = verifyZkProof(input)
 		if err != nil {
-			logToFile("verify ZK proof failed\n")
 			return nil, err
 		}
 	}
 	ctHash := crypto.Keccak256Hash(ciphertext)
-	logToFile("verify hash: " + ctHash.Hex() + "\n")
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ciphertext}
 	return ctHash.Bytes(), nil
 }
@@ -1627,41 +1615,27 @@ func init() {
 	if e != nil {
 		panic(e)
 	}
-
-	logToFile("START\n")
-}
-
-func logToFile(s string) {
-	fileLog.WriteString(s)
-	fileLog.Sync()
 }
 
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if !accessibleState.Interpreter().evm.EthCall {
-		logToFile("Not an EthCall\n")
 		return nil, errors.New("reencrypt not supported in write commands")
 	}
 	if len(input) != 32 {
-		logToFile("Invalid input len\n")
 		return nil, errors.New("invalid ciphertext handle")
 	}
-	logToFile("reencrypt input: " + common.BytesToHash(input).Hex() + "\n")
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
 		decryptedValue, err := fheDecrypt(ct.ciphertext)
-		logToFile("fheDecrypt failed\n")
 		if err != nil {
-			logToFile("fheDecrypt failed\n")
 			return nil, err
 		}
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
 		if err != nil {
-			logToFile("fheEncryptToUserKey failed\n")
 			return nil, err
 		}
 		return toEVMBytes(reencryptedValue), nil
 	}
-	logToFile("Unverified ciphertext handle\n")
 	return nil, errors.New("unverified ciphertext handle")
 }
 
