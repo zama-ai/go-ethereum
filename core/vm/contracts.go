@@ -158,6 +158,10 @@ void public_encrypt_integer(BufferView pks_buff_view, uint64_t val, Buffer* ct_b
 	destroy_shortint_ciphertext(ct);
 }
 
+void free_buffer(Buffer* buf)
+{
+	destroy_buffer(buf);
+}
 */
 import "C"
 
@@ -1439,6 +1443,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	C.free(cServerKey)
 	C.free(cCiphertext1)
 	C.free(cCiphertext2)
+	C.destroy_buffer(result)
 
 	return ctHash[:], nil
 }
@@ -1501,6 +1506,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	}
 
 	C.free(cServerKey)
+	C.destroy_buffer(result)
 
 	return ctBytes, nil
 }
@@ -1534,6 +1540,7 @@ func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, erro
 	}
 
 	C.free(cPublicKey)
+	C.destroy_buffer(result)
 
 	return ctBytes, nil
 }
@@ -1842,6 +1849,7 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	C.free(cServerKey)
 	C.free(cCiphertext1)
 	C.free(cCiphertext2)
+	C.destroy_buffer(result)
 
 	return ctHash[:], nil
 }
@@ -1915,6 +1923,7 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	C.free(cServerKey)
 	C.free(cCiphertext1)
 	C.free(cCiphertext2)
+	C.destroy_buffer(result)
 
 	return ctHash[:], nil
 }
