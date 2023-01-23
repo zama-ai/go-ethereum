@@ -120,6 +120,9 @@ void encrypt_integer(BufferView cks_buff_view, uint64_t val, Buffer* ct_buf)
 
 	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
 	assert(ser_ok == 0);
+
+	destroy_shortint_ciphertext(ct);
+	destroy_shortint_client_key(cks);
 }
 
 uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
@@ -136,6 +139,9 @@ uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
 
 	int ct_decrypt = shortint_bc_client_key_decrypt(cks, ct, &res);
 	assert(ct_decrypt == 0);
+
+	destroy_shortint_ciphertext(ct);
+	destroy_shortint_client_key(cks);
 
 	return res;
 }
