@@ -16,165 +16,9 @@
 
 package vm
 
-/*
-#cgo LDFLAGS: -Llib -ltfhe
-#include "tfhe.h"
-#include <assert.h>
-#include <stdlib.h>
-
-void add_encrypted_integers(BufferView sks_view, BufferView ct1_view, BufferView ct2_view, Buffer* result)
-{
-	ShortintServerKey *sks = NULL;
-	ShortintCiphertext *ct1 = NULL;
-	ShortintCiphertext *ct2 = NULL;
-	ShortintCiphertext *result_ct = NULL;
-
-	int deser_sks_ok = shortint_deserialize_server_key(sks_view, &sks);
-	assert(deser_sks_ok == 0);
-
-	int deser_ct1_ok = shortint_deserialize_ciphertext(ct1_view, &ct1);
-	assert(deser_ct1_ok == 0);
-
-	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
-	assert(deser_ct2_ok == 0);
-
-	int add_ok = shortint_bc_server_key_smart_add(sks, ct1, ct2, &result_ct);
-	assert(add_ok == 0);
-
-	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
-	assert(ser_ok == 0);
-
-	destroy_shortint_server_key(sks);
-	destroy_shortint_ciphertext(ct1);
-	destroy_shortint_ciphertext(ct2);
-	destroy_shortint_ciphertext(result_ct);
-}
-
-void sub_encrypted_integers(BufferView sks_view, BufferView ct1_view, BufferView ct2_view, Buffer* result)
-{
-	ShortintServerKey *sks = NULL;
-	ShortintCiphertext *ct1 = NULL;
-	ShortintCiphertext *ct2 = NULL;
-	ShortintCiphertext *result_ct = NULL;
-
-	int deser_sks_ok = shortint_deserialize_server_key(sks_view, &sks);
-	assert(deser_sks_ok == 0);
-
-	int deser_ct1_ok = shortint_deserialize_ciphertext(ct1_view, &ct1);
-	assert(deser_ct1_ok == 0);
-
-	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
-	assert(deser_ct2_ok == 0);
-
-	int add_ok = shortint_bc_server_key_smart_sub(sks, ct1, ct2, &result_ct);
-	assert(add_ok == 0);
-
-	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
-	assert(ser_ok == 0);
-
-	destroy_shortint_server_key(sks);
-	destroy_shortint_ciphertext(ct1);
-	destroy_shortint_ciphertext(ct2);
-	destroy_shortint_ciphertext(result_ct);
-}
-
-void less_or_equal(BufferView sks_view, BufferView ct1_view, BufferView ct2_view, Buffer* result)
-{
-	ShortintServerKey *sks = NULL;
-	ShortintCiphertext *ct1 = NULL;
-	ShortintCiphertext *ct2 = NULL;
-	ShortintCiphertext *result_ct = NULL;
-
-	int deser_sks_ok = shortint_deserialize_server_key(sks_view, &sks);
-	assert(deser_sks_ok == 0);
-
-	int deser_ct1_ok = shortint_deserialize_ciphertext(ct1_view, &ct1);
-	assert(deser_ct1_ok == 0);
-
-	int deser_ct2_ok = shortint_deserialize_ciphertext(ct2_view, &ct2);
-	assert(deser_ct2_ok == 0);
-
-	int comp_ok = shortint_bc_server_key_smart_less_or_equal(sks, ct1, ct2, &result_ct);
-	assert(comp_ok == 0);
-
-	int ser_ok = shortint_serialize_ciphertext(result_ct, result);
-	assert(ser_ok == 0);
-
-	destroy_shortint_server_key(sks);
-	destroy_shortint_ciphertext(ct1);
-	destroy_shortint_ciphertext(ct2);
-	destroy_shortint_ciphertext(result_ct);
-}
-
-
-void encrypt_integer(BufferView cks_buff_view, uint64_t val, Buffer* ct_buf)
-{
-	ShortintCiphertext *ct = NULL;
-	ShortintClientKey *cks = NULL;
-
-	int deser_ok = shortint_deserialize_client_key(cks_buff_view, &cks);
-	assert(deser_ok == 0);
-
-	int encrypt_ok = shortint_bc_client_key_encrypt(cks, val, &ct);
-	assert(encrypt_ok == 0);
-
-	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
-	assert(ser_ok == 0);
-
-	destroy_shortint_ciphertext(ct);
-	destroy_shortint_client_key(cks);
-}
-
-uint64_t decrypt_integer(BufferView cks_buf_view, BufferView ct_buf_view)
-{
-	ShortintCiphertext *ct = NULL;
-	ShortintClientKey *cks = NULL;
-	uint64_t res = -1;
-
-	int cks_deser_ok = shortint_deserialize_client_key(cks_buf_view, &cks);
-	assert(cks_deser_ok == 0);
-
-	int ct_deser_ok = shortint_deserialize_ciphertext(ct_buf_view, &ct);
-	assert(ct_deser_ok == 0);
-
-	int ct_decrypt = shortint_bc_client_key_decrypt(cks, ct, &res);
-	assert(ct_decrypt == 0);
-
-	destroy_shortint_ciphertext(ct);
-	destroy_shortint_client_key(cks);
-
-	return res;
-}
-
-void public_encrypt_integer(BufferView pks_buff_view, uint64_t val, Buffer* ct_buf)
-{
-	ShortintCiphertext *ct = NULL;
-	ShortintPublicKey *pks = NULL;
-
-	int deser_ok = shortint_deserialize_public_key(pks_buff_view, &pks);
-	assert(deser_ok == 0);
-
-	int encrypt_ok = shortint_bc_public_key_encrypt(pks, val, &ct);
-  	assert(encrypt_ok == 0);
-
-	int ser_ok = shortint_serialize_ciphertext(ct, ct_buf);
-	assert(ser_ok == 0);
-
-	destroy_shortint_public_key(pks);
-	destroy_shortint_ciphertext(ct);
-}
-
-void free_buffer(Buffer* buf)
-{
-	destroy_buffer(buf);
-}
-*/
-import "C"
-
 import (
 	"bytes"
 	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -186,7 +30,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -1260,9 +1103,6 @@ func (c *bls12381MapG2) Run(accessibleState PrecompileAccessibleState, caller co
 	return g.EncodePoint(r), nil
 }
 
-var networkKeysDir string
-var usersKeysDir string
-
 type tomlConfigOptions struct {
 	Oracle struct {
 		Mode            string
@@ -1276,14 +1116,6 @@ type tomlConfigOptions struct {
 }
 
 var tomlConfig tomlConfigOptions
-
-func homeDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	return home
-}
 
 func generateEd25519Keys() error {
 	public, private, err := ed25519.GenerateKey(nil)
@@ -1326,8 +1158,6 @@ func signRequire(ciphertext []byte, value bool) string {
 
 func init() {
 	home := homeDir()
-	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
-	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
 
 	f, err := os.Open(home + "/.evmosd/zama/config/zama_config.toml")
 	if err != nil {
@@ -1356,7 +1186,7 @@ func init() {
 	}
 }
 
-func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) ([]byte, bool) {
+func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) (*tfheCiphertext, bool) {
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[ciphertextHash]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
 		return ct.ciphertext, true
@@ -1365,17 +1195,14 @@ func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertext
 }
 
 // Used when we want to skip FHE computation, e.g. gas estimation.
-func importRandomCiphertext(accessibleState PrecompileAccessibleState, length int) []byte {
-	randomCt := make([]byte, length)
-	_, err := rand.Read(randomCt)
-	if err != nil {
-		panic("failed to create a random ciphertext")
-	}
+func importRandomCiphertext(accessibleState PrecompileAccessibleState) []byte {
+	ct := new(tfheCiphertext)
+	ct.encrypt(1)
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: randomCt,
+		ciphertext: ct,
 	}
-	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext.serialize())
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 	return ctHash[:]
 }
@@ -1392,163 +1219,52 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	verifiedCiphertext1, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	a, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	b, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
 	// If we are not committing state, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit {
-		return importRandomCiphertext(accessibleState, len(verifiedCiphertext1)), nil
+		return importRandomCiphertext(accessibleState), nil
 	}
 
-	sks, err := os.ReadFile(networkKeysDir + "sks")
-	if err != nil {
-		return nil, err
-	}
-
-	cCiphertext1 := C.CBytes(verifiedCiphertext1)
-	viewCiphertext1 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext1),
-		length:  (C.ulong)(len(verifiedCiphertext1)),
-	}
-
-	cCiphertext2 := C.CBytes(verifiedCiphertext2)
-	viewCiphertext2 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext2),
-		length:  (C.ulong)(len(verifiedCiphertext2)),
-	}
-
-	cServerKey := C.CBytes(sks)
-	viewServerKey := C.BufferView{
-		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(sks)),
-	}
-
-	result := &C.Buffer{}
-	C.add_encrypted_integers(viewServerKey, viewCiphertext1, viewCiphertext2, result)
-
-	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
+	result := a.add(b)
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: ctBytes,
+		ciphertext: result,
 	}
 
-	err = os.WriteFile("/tmp/add_result", ctBytes, 0644)
+	// TODO: for testing
+	err := os.WriteFile("/tmp/add_result", verifiedCiphertext.ciphertext.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	ctHash := verifiedCiphertext.ciphertext.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
-
-	C.free(cServerKey)
-	C.free(cCiphertext1)
-	C.free(cCiphertext2)
-	C.destroy_buffer(result)
-
 	return ctHash[:], nil
 }
 
-func fheDecrypt(input []byte) (uint64, error) {
-	cks, err := os.ReadFile(networkKeysDir + "cks")
-	if err != nil {
-		return 0, err
-	}
-
-	ciphertext := C.CBytes(input)
-	viewCiphertext := C.BufferView{
-		pointer: (*C.uchar)(ciphertext),
-		length:  (C.ulong)(len(input)),
-	}
-
-	cServerKey := C.CBytes(cks)
-	viewServerKey := C.BufferView{
-		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(cks)),
-	}
-
-	decryted_value := C.decrypt_integer(viewServerKey, viewCiphertext)
-	decryted_value_bytes := uint256.NewInt(uint64(decryted_value)).Bytes()
-
-	// TODO: for testing
-	err = os.WriteFile("/tmp/decryption_result", decryted_value_bytes, 0644)
-	if err != nil {
-		return 0, err
-	}
-
-	C.free(cServerKey)
-	C.free(ciphertext)
-
-	return uint64(decryted_value), nil
-}
-
-func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
-	networkKey := strings.ToLower(networkKeysDir + "cks")
-	cks, err := os.ReadFile(networkKey)
-	if err != nil {
-		return nil, err
-	}
-
-	cServerKey := C.CBytes(cks)
-	viewServerKey := C.BufferView{
-		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(cks)),
-	}
-
-	result := &C.Buffer{}
-	C.encrypt_integer(viewServerKey, C.ulong(value), result)
-
-	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
-
-	// TODO: for testing
-	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	C.free(cServerKey)
-	C.destroy_buffer(result)
-
-	return ctBytes, nil
-}
-
 func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, error) {
-	if value > 15 {
-		return nil, errors.New("input must be less than 15")
-	}
-
 	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
 	pks, err := os.ReadFile(userPublicKey)
 	if err != nil {
 		return nil, err
 	}
-
-	cPublicKey := C.CBytes(pks)
-	viewPublicKey := C.BufferView{
-		pointer: (*C.uchar)(cPublicKey),
-		length:  (C.ulong)(len(pks)),
-	}
-
-	result := &C.Buffer{}
-	C.public_encrypt_integer(viewPublicKey, C.ulong(value), result)
-
-	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
+	ct := publicKeyEncrypt(pks, value)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/public_encrypt_result", ctBytes, 0644)
+	err = os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	C.free(cPublicKey)
-	C.destroy_buffer(result)
-
-	return ctBytes, nil
+	return ct, nil
 }
 
 type verifyCiphertext struct{}
@@ -1578,26 +1294,20 @@ func verifyZkProof(input []byte) ([]byte, error) {
 	return body, nil
 }
 
-const ciphertextSize = 7008
-
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	var ciphertext []byte
-	if !tomlConfig.Zk.Verify {
-		// For testing: If input size <= `ciphertextSize`, treat the whole input as ciphertext.
-		ciphertext = input[0:minInt(ciphertextSize, len(input))]
-	} else {
-		// If we are not committing state, skip verificaton and insert a random ciphertext as a result.
-		if !accessibleState.Interpreter().evm.Commit {
-			return importRandomCiphertext(accessibleState, ciphertextSize), nil
-		}
-		var err error
-		ciphertext, err = verifyZkProof(input)
-		if err != nil {
-			return nil, err
-		}
+	// If we are not committing state, skip verificaton and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit {
+		return importRandomCiphertext(accessibleState), nil
 	}
-	ctHash := crypto.Keccak256Hash(ciphertext)
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ciphertext}
+	var err error
+	ctBytes, err := verifyZkProof(input)
+	if err != nil {
+		return nil, err
+	}
+	ct := new(tfheCiphertext)
+	ct.deserialize(ctBytes)
+	ctHash := ct.getHash()
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ct}
 	return ctHash.Bytes(), nil
 }
 
@@ -1620,16 +1330,6 @@ func (e *reencrypt) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-var fileLog *os.File
-
-func init() {
-	var e error
-	fileLog, e = os.OpenFile("/tmp/go-eth.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if e != nil {
-		panic(e)
-	}
-}
-
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if !accessibleState.Interpreter().evm.EthCall {
 		return nil, errors.New("reencrypt not supported in write commands")
@@ -1639,10 +1339,7 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
-		decryptedValue, err := fheDecrypt(ct.ciphertext)
-		if err != nil {
-			return nil, err
-		}
+		decryptedValue := ct.ciphertext.decrypt()
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
 		if err != nil {
 			return nil, err
@@ -1686,6 +1383,11 @@ type requireMessage struct {
 func requireKey(ciphertext []byte) string {
 	// Take the Keccak256 and remove the leading 0x.
 	return crypto.Keccak256Hash(ciphertext).Hex()[2:]
+}
+
+func requireKeyFromHash(hash common.Hash) string {
+	// Take the hash and remove the leading 0x.
+	return hash.Hex()[2:]
 }
 
 func requireURL(key *string) string {
@@ -1762,11 +1464,8 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	}
 	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
 	case "oracle":
-		requireValue, err := fheDecrypt(ct.ciphertext)
-		if err != nil {
-			return nil, err
-		}
-		if err := putRequire(ct.ciphertext, requireValue != 0); err != nil {
+		requireValue := ct.ciphertext.decrypt()
+		if err := putRequire(ct.ciphertext.serialize(), requireValue != 0); err != nil {
 			return nil, err
 		}
 		if requireValue == 0 {
@@ -1774,7 +1473,7 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 		}
 		return nil, nil
 	case "node":
-		requireValue, err := getRequire(ct.ciphertext)
+		requireValue, err := getRequire(ct.ciphertext.serialize())
 		if err != nil {
 			return nil, err
 		}
@@ -1809,53 +1508,23 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	// If we are not committing state, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit {
-		return importRandomCiphertext(accessibleState, len(lhsCt)), nil
+		return importRandomCiphertext(accessibleState), nil
 	}
 
-	sks, err := os.ReadFile(networkKeysDir + "sks")
-	if err != nil {
-		return nil, err
-	}
-
-	cCiphertext1 := C.CBytes(lhsCt)
-	viewCiphertext1 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext1),
-		length:  (C.ulong)(len(lhsCt)),
-	}
-
-	cCiphertext2 := C.CBytes(rhsCt)
-	viewCiphertext2 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext2),
-		length:  (C.ulong)(len(rhsCt)),
-	}
-
-	cServerKey := C.CBytes(sks)
-	viewServerKey := C.BufferView{
-		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(sks)),
-	}
-
-	result := &C.Buffer{}
-	C.less_or_equal(viewServerKey, viewCiphertext1, viewCiphertext2, result)
-
-	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
+	result := lhsCt.lte(rhsCt)
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: ctBytes,
+		ciphertext: result,
 	}
 
-	err = os.WriteFile("/tmp/lte_result", ctBytes, 0644)
+	// TODO: for testing
+	err := os.WriteFile("/tmp/lte_result", verifiedCiphertext.ciphertext.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	ctHash := result.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
-
-	C.free(cServerKey)
-	C.free(cCiphertext1)
-	C.free(cCiphertext2)
-	C.destroy_buffer(result)
 
 	return ctHash[:], nil
 }
@@ -1872,64 +1541,34 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	verifiedCiphertext1, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
 	// If we are not committing state, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit {
-		return importRandomCiphertext(accessibleState, len(verifiedCiphertext1)), nil
+		return importRandomCiphertext(accessibleState), nil
 	}
 
-	sks, err := os.ReadFile(networkKeysDir + "sks")
-	if err != nil {
-		return nil, err
-	}
-
-	cCiphertext1 := C.CBytes(verifiedCiphertext1)
-	viewCiphertext1 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext1),
-		length:  (C.ulong)(len(verifiedCiphertext1)),
-	}
-
-	cCiphertext2 := C.CBytes(verifiedCiphertext2)
-	viewCiphertext2 := C.BufferView{
-		pointer: (*C.uchar)(cCiphertext2),
-		length:  (C.ulong)(len(verifiedCiphertext2)),
-	}
-
-	cServerKey := C.CBytes(sks)
-	viewServerKey := C.BufferView{
-		pointer: (*C.uchar)(cServerKey),
-		length:  (C.ulong)(len(sks)),
-	}
-
-	result := &C.Buffer{}
-	C.sub_encrypted_integers(viewServerKey, viewCiphertext1, viewCiphertext2, result)
-
-	ctBytes := C.GoBytes(unsafe.Pointer(result.pointer), C.int(result.length))
+	result := lhsCt.sub(rhsCt)
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: ctBytes,
+		ciphertext: result,
 	}
 
-	err = os.WriteFile("/tmp/add_result", ctBytes, 0644)
+	// TODO: for testing
+	err := os.WriteFile("/tmp/sub_result", verifiedCiphertext.ciphertext.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext)
+	ctHash := result.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
-
-	C.free(cServerKey)
-	C.free(cCiphertext1)
-	C.free(cCiphertext2)
-	C.destroy_buffer(result)
 
 	return ctHash[:], nil
 }

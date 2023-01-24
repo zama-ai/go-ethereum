@@ -54,7 +54,7 @@ type keccakState interface {
 
 type verifiedCiphertext struct {
 	depth      int
-	ciphertext []byte
+	ciphertext *tfheCiphertext
 }
 
 // EVMInterpreter represents an EVM interpreter

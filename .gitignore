@@ -49,5 +49,5 @@ profile.cov
 **/yarn-error.log
 
 # TFHE
-core/vm/tfhe*
+core/vm/tfhe.h
 core/vm/lib/libtfhe*
