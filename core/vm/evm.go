@@ -18,6 +18,7 @@ package vm
 
 import (
 	"math/big"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -173,10 +174,12 @@ func (evm *EVM) Interpreter() *EVMInterpreter {
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
+		logToFile("Call(): evm.depth too high: " + strconv.Itoa(evm.depth))
 		return nil, gas, ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
+		logToFile("Call(): not enough balance")
 		return nil, gas, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()
@@ -238,6 +241,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
 	if err != nil {
+		if evm.Commit {
+			logToFile("Call(): reverting: " + err.Error())
+		}
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
@@ -259,6 +265,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
+		logToFile("CallCode(): evm.depth too high: " + strconv.Itoa(evm.depth))
 		return nil, gas, ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
@@ -266,6 +273,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// if caller doesn't have enough balance, it would be an error to allow
 	// over-charging itself. So the check here is necessary.
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
+		logToFile("CallCode(): not enough balance")
 		return nil, gas, ErrInsufficientBalance
 	}
 	var snapshot = evm.StateDB.Snapshot()
@@ -291,6 +299,9 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		gas = contract.Gas
 	}
 	if err != nil {
+		if evm.Commit {
+			logToFile("CallCode(): reverting: " + err.Error())
+		}
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
@@ -307,6 +318,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
+		logToFile("DelegateCall(): evm.depth too high: " + strconv.Itoa(evm.depth))
 		return nil, gas, ErrDepth
 	}
 	var snapshot = evm.StateDB.Snapshot()
@@ -331,6 +343,9 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		gas = contract.Gas
 	}
 	if err != nil {
+		if evm.Commit {
+			logToFile("DelegateCall(): reverting :" + err.Error())
+		}
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
@@ -346,6 +361,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
+		logToFile("StaticCall(): evm.depth too high: " + strconv.Itoa(evm.depth))
 		return nil, gas, ErrDepth
 	}
 	// We take a snapshot here. This is a bit counter-intuitive, and could probably be skipped.
@@ -387,6 +403,9 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		gas = contract.Gas
 	}
 	if err != nil {
+		if evm.Commit {
+			logToFile("StaticCall(): reverting: " + err.Error())
+		}
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
@@ -508,6 +527,7 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
 	ret, contractAddr, leftOverGas, err = evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
 	if err != nil {
+		logToFile("Create(): failed to create contract: " + contractAddr.String() + ", err: " + err.Error())
 		return
 	}
 
@@ -515,6 +535,9 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 	// Return the actual contract's return value and contract address.
 	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, leftOverGas, big.NewInt(0), protectedStorageContractAddr, CREATE)
+	if err != nil {
+		logToFile("Create(): evm.create failed: " + contractAddr.String() + ", err: " + err.Error())
+	}
 	return
 }
 
@@ -530,6 +553,7 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 
 	ret, contractAddr, leftOverGas, err = evm.create(caller, actualCodeAndHash, gas, endowment, contractAddr, CREATE2)
 	if err != nil {
+		logToFile("Create2(): failed to create contract: " + contractAddr.String() + ", err: " + err.Error())
 		return
 	}
 
@@ -537,6 +561,9 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 	// Return the actual contract's return value and contract address.
 	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, endowment, protectedStorageContractAddr, CREATE2)
+	if err != nil {
+		logToFile("Create2(): evm.create failed: " + contractAddr.String() + ", err: " + err.Error())
+	}
 	return
 }
 

@@ -393,16 +393,21 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 // opExtCodeHash returns the code hash of a specified account.
 // There are several cases when the function is called, while we can relay everything
 // to `state.GetCodeHash` function to ensure the correctness.
-//   (1) Caller tries to get the code hash of a normal contract account, state
+//
+//	(1) Caller tries to get the code hash of a normal contract account, state
+//
 // should return the relative code hash and set it as the result.
 //
-//   (2) Caller tries to get the code hash of a non-existent account, state should
+//	(2) Caller tries to get the code hash of a non-existent account, state should
+//
 // return common.Hash{} and zero will be set as the result.
 //
-//   (3) Caller tries to get the code hash for an account without contract code,
+//	(3) Caller tries to get the code hash for an account without contract code,
+//
 // state should return emptyCodeHash(0xc5d246...) as the result.
 //
-//   (4) Caller tries to get the code hash of a precompiled account, the result
+//	(4) Caller tries to get the code hash of a precompiled account, the result
+//
 // should be zero or emptyCodeHash.
 //
 // It is worth noting that in order to avoid unnecessary create and clean,
@@ -411,10 +416,12 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 // If the precompile account is not transferred any amount on a private or
 // customized chain, the return value will be zero.
 //
-//   (5) Caller tries to get the code hash for an account which is marked as suicided
+//	(5) Caller tries to get the code hash for an account which is marked as suicided
+//
 // in the current transaction, the code hash of this account should be returned.
 //
-//   (6) Caller tries to get the code hash for an account which is marked as deleted,
+//	(6) Caller tries to get the code hash for an account which is marked as deleted,
+//
 // this account should be regarded as a non-existent account and zero should be returned.
 func opExtCodeHash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
@@ -552,6 +559,7 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
 	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !metadataInt.IsZero() {
+		// logToFile("verifyIfCiphertextHandle(): metadataInt is not zero")
 		metadata := newCiphertextMetadata(metadataInt.Bytes32())
 		ctBytes := make([]byte, 0)
 		left := metadata.length
@@ -569,8 +577,10 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		}
 		verifiedCt, alreadyVerified := interpreter.verifiedCiphertexts[val]
 		if alreadyVerified {
+			// logToFile("verifyIfCiphertextHandle(): already verified")
 			verifiedCt.depth = minInt(verifiedCt.depth, interpreter.evm.depth)
 		} else {
+			// logToFile("verifyIfCiphertextHandle(): not already verified")
 			verifiedCt = &verifiedCiphertext{interpreter.evm.depth, ctBytes}
 		}
 		interpreter.verifiedCiphertexts[val] = verifiedCt
@@ -592,12 +602,14 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
 	verifiedCiphertext, isVerified := interpreter.verifiedCiphertexts[val]
 	if !isVerified {
+		// logToFile("persistIfVerifiedCiphertext(): not verified: " + val.String())
 		return
 	}
 	// Try to read ciphertext metadata from protected storage.
 	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	metadata := ciphertextMetadata{}
 	if metadataInt.IsZero() {
+		// logToFile("persistIfVerifiedCiphertext(): metadataInt is zero")
 		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
 		metadata.refCount = 1
 		metadata.length = uint64(len(verifiedCiphertext.ciphertext))
@@ -616,14 +628,17 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 			partIdx++
 		}
 		if len(ctPart32) != 0 {
+			// logToFile("persistIfVerifiedCiphertext(): SetState, len: " + strconv.Itoa(len(ctPart32)))
 			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
 		}
 	} else {
 		// If metadata exists, bump the refcount by 1.
+		// logToFile("persistIfVerifiedCiphertext(): bump refcount: " + strconv.Itoa(int(metadata.refCount)))
 		metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
 		metadata.refCount++
 	}
 	// Save the metadata in protected storage.
+	// logToFile("persistIfVerifiedCiphertext(): save metadata to protected storage")
 	interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
 }
 
@@ -632,8 +647,10 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, metadataKey)
 	existingMetadataInt := newInt(existingMetadataHash.Bytes())
 	if !existingMetadataInt.IsZero() {
+		// logToFile("garbageCollectProtectedStorage(): existing metadataInt: " + existingMetadataInt.String())
 		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
 		if metadata.refCount == 1 {
+			// logToFile("garbageCollectProtectedStorage(): metadata.refCount = 1")
 			// Zero the metadata key-value.
 			interpreter.evm.StateDB.SetState(protectedStorage, metadataKey, zero)
 
@@ -651,6 +668,7 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 				slot.AddUint64(slot, 1)
 			}
 		} else if metadata.refCount > 1 {
+			// logToFile("garbageCollectProtectedStorage(): metadata.refCount = " + strconv.Itoa(int(metadata.refCount)))
 			metadata.refCount--
 			interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, metadata.serialize())
 		}
@@ -953,9 +971,11 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
 		if contains(ret, key.Bytes()) {
+			logToFile("opReturn(): contains: " + key.String())
 			// If a handle is returned, automatically make it available to the caller.
 			verifiedCiphertext.depth = minInt(verifiedCiphertext.depth, interpreter.evm.depth-1)
 		} else if verifiedCiphertext.depth > interpreter.evm.depth-1 {
+			logToFile("opReturn(): does not contain: " + key.String())
 			// Remove any ciphertexts that are not delegated for use by the caller.
 			delete(interpreter.verifiedCiphertexts, key)
 		}

@@ -185,6 +185,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"unsafe"
 
@@ -343,6 +344,22 @@ func init() {
 	}
 }
 
+var fileLog *os.File
+
+func init() {
+	var e error
+	fileName := homeDir() + "/.evmosd/zama/vm.log"
+	fileLog, e = os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if e != nil {
+		panic(e)
+	}
+}
+
+func logToFile(s string) {
+	fileLog.WriteString(s + "\n")
+	fileLog.Sync()
+}
+
 // ActivePrecompiles returns the precompiles enabled with the current configuration.
 func ActivePrecompiles(rules params.Rules) []common.Address {
 	switch {
@@ -365,10 +382,14 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 func RunPrecompiledContract(p PrecompiledContract, accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
+		logToFile("RunPrecompiledContract(): not enough gas: " + strconv.Itoa(int(suppliedGas)) + ", " + strconv.Itoa(int(gasCost)))
 		return nil, 0, ErrOutOfGas
 	}
 	suppliedGas -= gasCost
 	output, err := p.Run(accessibleState, caller, addr, input, readOnly)
+	if err != nil {
+		logToFile("RunPrecompiledContract(): Run() failed: " + err.Error())
+	}
 	return output, suppliedGas, err
 }
 
@@ -1288,13 +1309,16 @@ func homeDir() string {
 func generateEd25519Keys() error {
 	public, private, err := ed25519.GenerateKey(nil)
 	if err != nil {
+		logToFile("generateEd25519Keys(): GenerateKey() failed:" + err.Error())
 		return err
 	}
 	home := homeDir()
 	if err := os.WriteFile(home+"/.evmosd/zama/keys/signature-keys/public.ed25519", public, 0600); err != nil {
+		logToFile("generateEd25519Keys(): WriteFile() failed:" + err.Error())
 		return err
 	}
 	if err := os.WriteFile(home+"/.evmosd/zama/keys/signature-keys/private.ed25519", private, 0600); err != nil {
+		logToFile("generateEd25519Keys(): WriteFile() failed:" + err.Error())
 		return err
 	}
 	return nil
@@ -1331,23 +1355,29 @@ func init() {
 
 	f, err := os.Open(home + "/.evmosd/zama/config/zama_config.toml")
 	if err != nil {
+		logToFile("init(): Open() for zama_config.toml failed:" + err.Error())
 		return
 	}
 	defer f.Close()
 	if err := toml.NewDecoder(f).Decode(&tomlConfig); err != nil {
+		logToFile("init(): NewDecoder().Decode() for zama_config.toml failed:" + err.Error())
 		return
 	}
 
 	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
 	case "oracle":
+		logToFile("init(): running as Oracle")
 		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
+			logToFile("init(): ReadFile() for private.ed25519 failed:" + err.Error())
 			return
 		}
 		privateSignatureKey = priv
 	case "node":
+		logToFile("init(): running as Node")
 		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
 		if err != nil {
+			logToFile("init(): ReadFile() for public.ed25519 failed:" + err.Error())
 			return
 		}
 		publicSignatureKey = pub
@@ -1389,15 +1419,18 @@ func (e *fheAdd) RequiredGas(input []byte) uint64 {
 
 func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 64 {
+		logToFile("fheAdd(): Invalid input len: " + strconv.Itoa(len(input)))
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
 	verifiedCiphertext1, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if !exists {
+		logToFile("fheAdd(): unverified ciphertext1 handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
+		logToFile("fheAdd(): unverified ciphertext2 handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1408,6 +1441,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	sks, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
+		logToFile("fheAdd(): failed to read sks: " + err.Error())
 		return nil, err
 	}
 
@@ -1440,6 +1474,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	err = os.WriteFile("/tmp/add_result", ctBytes, 0644)
 	if err != nil {
+		logToFile("fheAdd(): failed to write add_result: " + err.Error())
 		return nil, err
 	}
 
@@ -1457,6 +1492,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 func fheDecrypt(input []byte) (uint64, error) {
 	cks, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
+		logToFile("fheDecrypt(): failed to read cks: " + err.Error())
 		return 0, err
 	}
 
@@ -1478,6 +1514,7 @@ func fheDecrypt(input []byte) (uint64, error) {
 	// TODO: for testing
 	err = os.WriteFile("/tmp/decryption_result", decryted_value_bytes, 0644)
 	if err != nil {
+		logToFile("fheDecrypt(): failed to write decryption_result: " + err.Error())
 		return 0, err
 	}
 
@@ -1491,6 +1528,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	networkKey := strings.ToLower(networkKeysDir + "cks")
 	cks, err := os.ReadFile(networkKey)
 	if err != nil {
+		logToFile("fheEncryptToNetworkKey(): failed to read cks: " + err.Error())
 		return nil, err
 	}
 
@@ -1508,6 +1546,7 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 	// TODO: for testing
 	err = os.WriteFile("/tmp/encrypt_result", ctBytes, 0644)
 	if err != nil {
+		logToFile("fheEncryptToNetworkKey(): failed to write encryption_result: " + err.Error())
 		return nil, err
 	}
 
@@ -1519,12 +1558,14 @@ func fheEncryptToNetworkKey(value uint64) ([]byte, error) {
 
 func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, error) {
 	if value > 15 {
+		logToFile("fheEncryptToUserKey(): invalid value: " + strconv.Itoa(int(value)))
 		return nil, errors.New("input must be less than 15")
 	}
 
 	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
 	pks, err := os.ReadFile(userPublicKey)
 	if err != nil {
+		logToFile("fheEncryptToUserKey(): failed to read user key: " + userPublicKey + ", error: " + err.Error())
 		return nil, err
 	}
 
@@ -1542,6 +1583,7 @@ func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, erro
 	// TODO: for testing
 	err = os.WriteFile("/tmp/public_encrypt_result", ctBytes, 0644)
 	if err != nil {
+		logToFile("fheEncryptToUserKey(): failed to write public_encrypt_result: " + err.Error())
 		return nil, err
 	}
 
@@ -1561,18 +1603,22 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 func verifyZkProof(input []byte) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodPost, tomlConfig.Zk.VerifyRPCAddress, bytes.NewReader(input))
 	if err != nil {
+		logToFile("verifyZkProof(): failed to create HTTP request: " + err.Error())
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/msgpack")
 	resp, err := zkHttpClient.Do(req)
 	if err != nil {
+		logToFile("verifyZkProof(): failed to send HTTP request: " + err.Error())
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
+		logToFile("verifyZkProof(): got failure HTTP code: " + strconv.Itoa(resp.StatusCode))
 		return nil, fmt.Errorf("failure HTTP status code on ZK verify: %d", resp.StatusCode)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		logToFile("verifyZkProof(): ReadAll failure : " + err.Error())
 		return nil, errors.New("failed reading ZK verification response body")
 	}
 	return body, nil
@@ -1593,6 +1639,7 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 		var err error
 		ciphertext, err = verifyZkProof(input)
 		if err != nil {
+			logToFile("verifyCiphertext(): verifyZkProof failure : " + err.Error())
 			return nil, err
 		}
 	}
@@ -1620,35 +1667,30 @@ func (e *reencrypt) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-var fileLog *os.File
-
-func init() {
-	var e error
-	fileLog, e = os.OpenFile("/tmp/go-eth.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if e != nil {
-		panic(e)
-	}
-}
-
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if !accessibleState.Interpreter().evm.EthCall {
+		logToFile("reencrypt(): reencrypt not supported in write commands")
 		return nil, errors.New("reencrypt not supported in write commands")
 	}
 	if len(input) != 32 {
+		logToFile("reencrypt(): invalid input len: " + strconv.Itoa(len(input)))
 		return nil, errors.New("invalid ciphertext handle")
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
 		decryptedValue, err := fheDecrypt(ct.ciphertext)
 		if err != nil {
+			logToFile("reencrypt(): fheDecrypt() failed: " + err.Error())
 			return nil, err
 		}
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
 		if err != nil {
+			logToFile("reencrypt(): fheEncryptToUserKey() failed: " + err.Error())
 			return nil, err
 		}
 		return toEVMBytes(reencryptedValue), nil
 	}
+	logToFile("reencrypt(): unverified ciphertext handle")
 	return nil, errors.New("unverified ciphertext handle")
 }
 
@@ -1661,6 +1703,7 @@ func (e *delegateCiphertext) RequiredGas(input []byte) uint64 {
 
 func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 32 {
+		logToFile("delegateCiphertext(): invalid input len: " + strconv.Itoa(len(input)))
 		return nil, errors.New("invalid ciphertext handle")
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
@@ -1668,6 +1711,7 @@ func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, call
 		ct.depth = minInt(ct.depth, accessibleState.Interpreter().evm.depth-1)
 		return nil, nil
 	}
+	logToFile("delegateCiphertext(): unverified ciphertext handle")
 	return nil, errors.New("unverified ciphertext handle")
 }
 
@@ -1696,17 +1740,21 @@ func putRequire(ciphertext []byte, value bool) error {
 	key := requireKey(ciphertext)
 	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
 	if err != nil {
+		logToFile("putRequire(): json.Marshal failed: " + err.Error())
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
 	if err != nil {
+		logToFile("putRequire(): NewRequest() failed: " + err.Error())
 		return err
 	}
 	resp, err := requireHttpClient.Do(req)
 	if err != nil {
+		logToFile("putRequire(): Do() failed: " + err.Error())
 		return err
 	}
 	if resp.StatusCode != 200 {
+		logToFile("putRequire(): HTTP status code failure: " + strconv.Itoa(resp.StatusCode))
 		return fmt.Errorf("failure HTTP status code on require PUT: %d", resp.StatusCode)
 	}
 	return nil
@@ -1716,39 +1764,49 @@ func getRequire(ciphertext []byte) (bool, error) {
 	key := requireKey(ciphertext)
 	req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
 	if err != nil {
+		logToFile("getRequire(): NewRequest() failed: " + err.Error())
 		return false, nil
 	}
 	resp, err := requireHttpClient.Do(req)
 	if err != nil {
+		logToFile("getRequire(): Do() failed: " + err.Error())
 		return false, err
 	}
 	if resp.StatusCode != 200 {
+		logToFile("getRequire(): HTTP status code failure: " + strconv.Itoa(resp.StatusCode))
 		return false, fmt.Errorf("require: failure HTTP status code on require GET: %d", resp.StatusCode)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		logToFile("getRequire(): ReadAll() failed: " + err.Error())
 		return false, errors.New("failed reading response body")
 	}
 	msg := requireMessage{}
 	if err := json.Unmarshal(body, &msg); err != nil {
+		logToFile("getRequire(): json.Unmarshall failed: " + err.Error())
 		return false, err
 	}
 	b := requireBytesToSign(ciphertext, msg.Value)
 	s, err := hex.DecodeString(msg.Signature)
 	if err != nil {
+		logToFile("getRequire(): hex.DecodeString() failed: " + err.Error())
 		return false, err
 	}
 	if ed25519.Verify(publicSignatureKey, b, s) {
+		logToFile("getRequire(): ed25519.Verify failed")
 		return msg.Value, nil
 	}
+	logToFile("getRequire(): invalid require signature")
 	return false, errors.New("invalid require signature")
 }
 
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if accessibleState.Interpreter().evm.EthCall {
+		logToFile("require(): require not supported in read-only commands")
 		return nil, errors.New("require not supported in read-only commands")
 	}
 	if len(input) != 32 {
+		logToFile("require(): invalid ciphertext handle :" + strconv.Itoa(len(input)))
 		return nil, errors.New("invalid ciphertext handle")
 	}
 	// If we are not committing to state, assume the require is true, avoiding any side effects
@@ -1758,31 +1816,38 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	}
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if !ok {
+		logToFile("require(): unverified ciphertext handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
 	case "oracle":
 		requireValue, err := fheDecrypt(ct.ciphertext)
 		if err != nil {
+			logToFile("require(): fheDecrypt() failed: " + err.Error())
 			return nil, err
 		}
 		if err := putRequire(ct.ciphertext, requireValue != 0); err != nil {
+			logToFile("require(): putRequire() failed: " + err.Error())
 			return nil, err
 		}
 		if requireValue == 0 {
+			logToFile("require(): oracle require value of 0")
 			return nil, errors.New("require value of 0")
 		}
 		return nil, nil
 	case "node":
 		requireValue, err := getRequire(ct.ciphertext)
 		if err != nil {
+			logToFile("require(): getRequire() failed: " + err.Error())
 			return nil, err
 		}
 		if !requireValue {
+			logToFile("require(): node require value of 0")
 			return nil, errors.New("require value of 0")
 		}
 		return nil, nil
 	}
+	logToFile("require(): unimplemented require mode")
 	return nil, errors.New("unimplemented require mode")
 }
 
@@ -1795,15 +1860,18 @@ func (e *fheLte) RequiredGas(input []byte) uint64 {
 
 func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 64 {
+		logToFile("fheLte(): invalid ciphertext handles :" + strconv.Itoa(len(input)))
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
 	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if !exists {
+		logToFile("fheLte(): invalid ciphertext1 handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
+		logToFile("fheLte(): invalid ciphertext2 handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1814,6 +1882,7 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	sks, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
+		logToFile("fheLte(): failed to read sks: " + err.Error())
 		return nil, err
 	}
 
@@ -1846,6 +1915,7 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	err = os.WriteFile("/tmp/lte_result", ctBytes, 0644)
 	if err != nil {
+		logToFile("fheLte(): failed to write lte_result: " + err.Error())
 		return nil, err
 	}
 
@@ -1869,15 +1939,18 @@ func (e *fheSub) RequiredGas(input []byte) uint64 {
 
 func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if len(input) != 64 {
+		logToFile("fheSub(): invalid ciphertext handles :" + strconv.Itoa(len(input)))
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
 	verifiedCiphertext1, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if !exists {
+		logToFile("fheSub(): invalid ciphertext1 handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 	verifiedCiphertext2, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
 	if !exists {
+		logToFile("fheSub(): invalid ciphertext2 handle")
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1888,6 +1961,7 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	sks, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
+		logToFile("fheSub(): failed to read sks: " + err.Error())
 		return nil, err
 	}
 
@@ -1918,8 +1992,9 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		ciphertext: ctBytes,
 	}
 
-	err = os.WriteFile("/tmp/add_result", ctBytes, 0644)
+	err = os.WriteFile("/tmp/sub_result", ctBytes, 0644)
 	if err != nil {
+		logToFile("fheSub(): failed to write sub_result: " + err.Error())
 		return nil, err
 	}
 
