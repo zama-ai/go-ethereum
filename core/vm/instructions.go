@@ -579,7 +579,10 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 			verifiedCt.depth = minInt(verifiedCt.depth, interpreter.evm.depth)
 		} else {
 			tfheCt := new(tfheCiphertext)
-			tfheCt.deserialize(ctBytes)
+			err := tfheCt.deserialize(ctBytes)
+			if err != nil {
+				panic(err)
+			}
 			verifiedCt = &verifiedCiphertext{interpreter.evm.depth, tfheCt}
 		}
 		interpreter.verifiedCiphertexts[val] = verifiedCt

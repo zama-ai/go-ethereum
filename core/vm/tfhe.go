@@ -42,7 +42,9 @@ void* deserialize_client_key(BufferView in) {
 void* deserialize_tfhe_ciphertext(BufferView in) {
 	ShortintCiphertext* ct = NULL;
 	const int r = shortint_deserialize_ciphertext(in, &ct);
-	assert(r == 0);
+	if(r != 0) {
+		return NULL;
+	}
 	return ct;
 }
 
@@ -128,6 +130,7 @@ void public_key_encrypt(BufferView pks_buf, uint64_t value, Buffer* out)
 */
 import "C"
 import (
+	"errors"
 	"os"
 	"runtime"
 	"unsafe"
@@ -184,13 +187,17 @@ type tfheCiphertext struct {
 	value         *uint64
 }
 
-func (ct *tfheCiphertext) deserialize(in []byte) *tfheCiphertext {
+func (ct *tfheCiphertext) deserialize(in []byte) error {
 	if ct.ptr != nil {
 		panic("cannot deserialize to an existing ciphertext")
 	}
-	ct.setPtr(C.deserialize_tfhe_ciphertext(toBufferView((in))))
+	ptr := C.deserialize_tfhe_ciphertext(toBufferView((in)))
+	if ptr == nil {
+		return errors.New("tfhe ciphertext deserialization failed")
+	}
+	ct.setPtr(ptr)
 	ct.serialization = in
-	return ct
+	return nil
 }
 
 func (ct *tfheCiphertext) encrypt(value uint64) {

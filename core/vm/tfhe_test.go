@@ -44,12 +44,24 @@ func TestTfheSerializeDeserialize(t *testing.T) {
 	val := uint64(2)
 	ctBytes := clientKeyEncrypt(val)
 	ct := new(tfheCiphertext)
-	ct.deserialize(ctBytes)
+	err := ct.deserialize(ctBytes)
+	if err != nil {
+		t.Fatalf("deserialization failed")
+	}
 	serialized := ct.serialize()
 	if !bytes.Equal(serialized, ctBytes) {
 		t.Fatalf("serialization failed")
 	}
 }
+
+func TestTfheDeserializeFailure(t *testing.T) {
+	ct := new(tfheCiphertext)
+	err := ct.deserialize(make([]byte, 10))
+	if err == nil {
+		t.Fatalf("deserialization must have failed")
+	}
+}
+
 func TestTfheAdd(t *testing.T) {
 	a := uint64(1)
 	b := uint64(1)

@@ -1305,7 +1305,10 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 		return nil, err
 	}
 	ct := new(tfheCiphertext)
-	ct.deserialize(ctBytes)
+	err = ct.deserialize(ctBytes)
+	if err != nil {
+		return nil, err
+	}
 	ctHash := ct.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ct}
 	return ctHash.Bytes(), nil
