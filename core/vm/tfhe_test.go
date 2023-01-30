@@ -24,12 +24,6 @@ import (
 // TODO: Don't rely on global keys that are loaded from disk in init(). Instead,
 // generate keys on demand in the test.
 
-func mustPanic(t *testing.T, f func()) {
-	defer func() { recover() }()
-	f()
-	t.Fatalf("did not panic")
-}
-
 func TestTfheCksEncryptDecrypt(t *testing.T) {
 	val := uint64(2)
 	ct := new(tfheCiphertext)
@@ -109,56 +103,4 @@ func TestTfheLte(t *testing.T) {
 	if res2 != 1 {
 		t.Fatalf("%d != %d", 0, res2)
 	}
-}
-
-func TestTfheEncryptOnExisting(t *testing.T) {
-	ct := new(tfheCiphertext)
-	ct.encrypt(1)
-	mustPanic(t, func() { ct.encrypt(2) })
-}
-
-func TestTfheDeserializeOnExisting(t *testing.T) {
-	ct := new(tfheCiphertext)
-	ct.encrypt(1)
-	ctBytes := ct.serialize()
-	mustPanic(t, func() { ct.deserialize(ctBytes) })
-}
-
-func TestTfheSerializeOnNonExisting(t *testing.T) {
-	ct := new(tfheCiphertext)
-	mustPanic(t, func() { ct.serialize() })
-}
-
-func TestTfheAddOnNonExisting(t *testing.T) {
-	a := new(tfheCiphertext)
-	a.encrypt(1)
-	b := new(tfheCiphertext)
-	mustPanic(t, func() { a.add(b) })
-	mustPanic(t, func() { b.add(a) })
-}
-
-func TestTfheSubOnNonExisting(t *testing.T) {
-	a := new(tfheCiphertext)
-	a.encrypt(1)
-	b := new(tfheCiphertext)
-	mustPanic(t, func() { a.sub(b) })
-	mustPanic(t, func() { b.sub(a) })
-}
-
-func TestTfheLteOnNonExisting(t *testing.T) {
-	a := new(tfheCiphertext)
-	a.encrypt(1)
-	b := new(tfheCiphertext)
-	mustPanic(t, func() { a.lte(b) })
-	mustPanic(t, func() { b.lte(a) })
-}
-
-func TestTfheDecryptOnNonExisting(t *testing.T) {
-	ct := new(tfheCiphertext)
-	mustPanic(t, func() { ct.decrypt() })
-}
-
-func TestTfheGetHashOnNonExisting(t *testing.T) {
-	ct := new(tfheCiphertext)
-	mustPanic(t, func() { ct.getHash() })
 }

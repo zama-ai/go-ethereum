@@ -1202,12 +1202,12 @@ func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertext
 // Used when we want to skip FHE computation, e.g. gas estimation.
 func importRandomCiphertext(accessibleState PrecompileAccessibleState) []byte {
 	ct := new(tfheCiphertext)
-	ct.encrypt(1)
+	ct.makeRandom()
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
 		ciphertext: ct,
 	}
-	ctHash := crypto.Keccak256Hash(verifiedCiphertext.ciphertext.serialize())
+	ctHash := ct.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 	return ctHash[:]
 }

@@ -130,6 +130,7 @@ void public_key_encrypt(BufferView pks_buf, uint64_t value, Buffer* out)
 */
 import "C"
 import (
+	"crypto/rand"
 	"errors"
 	"os"
 	"runtime"
@@ -197,15 +198,20 @@ func init() {
 	go runGc()
 }
 
+// Represents a TFHE ciphertext.
+//
+// Once a ciphertext has a value (either from deserialization, encryption or makeRandom()),
+// it must not be set another value. If that is needed, a new ciphertext must be created.
 type tfheCiphertext struct {
 	ptr           unsafe.Pointer
 	serialization []byte
 	hash          []byte
 	value         *uint64
+	random        bool
 }
 
 func (ct *tfheCiphertext) deserialize(in []byte) error {
-	if ct.ptr != nil {
+	if ct.initialized() {
 		panic("cannot deserialize to an existing ciphertext")
 	}
 	ptr := C.deserialize_tfhe_ciphertext(toBufferView((in)))
@@ -218,19 +224,27 @@ func (ct *tfheCiphertext) deserialize(in []byte) error {
 }
 
 func (ct *tfheCiphertext) encrypt(value uint64) {
-	if ct.ptr != nil {
+	if ct.initialized() {
 		panic("cannot encrypt to an existing ciphertext")
 	}
 	ct.setPtr(C.client_key_encrypt(cks, C.ulong(value)))
 	ct.value = &value
 }
 
-func (ct *tfheCiphertext) serialize() []byte {
-	if ct.serialization != nil {
-		return ct.serialization
+func (ct *tfheCiphertext) makeRandom() {
+	if ct.initialized() {
+		panic("cannot make an existing ciphertext random")
 	}
-	if ct.ptr == nil {
-		panic("cannot serialize a null ciphertext")
+	ct.serialization = make([]byte, ciphertextSize)
+	rand.Read(ct.serialization)
+	ct.random = true
+}
+
+func (ct *tfheCiphertext) serialize() []byte {
+	if !ct.initialized() {
+		panic("cannot serialize a non-initialized ciphertext")
+	} else if ct.serialization != nil {
+		return ct.serialization
 	}
 	out := &C.Buffer{}
 	C.serialize_tfhe_ciphertext(ct.ptr, out)
@@ -240,8 +254,8 @@ func (ct *tfheCiphertext) serialize() []byte {
 }
 
 func (lhs *tfheCiphertext) add(rhs *tfheCiphertext) *tfheCiphertext {
-	if lhs.ptr == nil || rhs.ptr == nil {
-		panic("cannot add on a null ciphertext")
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot add on a non-initialized ciphertext")
 	}
 	res := new(tfheCiphertext)
 	res.setPtr(C.tfhe_add(sks, lhs.ptr, rhs.ptr))
@@ -249,8 +263,8 @@ func (lhs *tfheCiphertext) add(rhs *tfheCiphertext) *tfheCiphertext {
 }
 
 func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) *tfheCiphertext {
-	if lhs.ptr == nil || rhs.ptr == nil {
-		panic("cannot sub on a null ciphertext")
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot sub on a non-initialized ciphertext")
 	}
 	res := new(tfheCiphertext)
 	res.setPtr(C.tfhe_sub(sks, lhs.ptr, rhs.ptr))
@@ -258,8 +272,8 @@ func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) *tfheCiphertext {
 }
 
 func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) *tfheCiphertext {
-	if lhs.ptr == nil || rhs.ptr == nil {
-		panic("cannot lte on a null ciphertext")
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot lte on a non-initialized ciphertext")
 	}
 	res := new(tfheCiphertext)
 	res.setPtr(C.tfhe_lte(sks, lhs.ptr, rhs.ptr))
@@ -267,10 +281,9 @@ func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) *tfheCiphertext {
 }
 
 func (ct *tfheCiphertext) decrypt() uint64 {
-	if ct.ptr == nil {
+	if !ct.availableForOps() {
 		panic("cannot decrypt a null ciphertext")
-	}
-	if ct.value != nil {
+	} else if ct.value != nil {
 		return *ct.value
 	}
 	value := uint64(C.decrypt(cks, ct.ptr))
@@ -290,13 +303,21 @@ func (ct *tfheCiphertext) setPtr(ptr unsafe.Pointer) {
 }
 
 func (ct *tfheCiphertext) getHash() common.Hash {
-	if ct.ptr == nil {
-		panic("cannot get hash of a null ciphertext")
+	if !ct.initialized() {
+		panic("cannot get hash of non-initialized ciphertext")
 	}
 	if ct.hash == nil {
 		ct.hash = crypto.Keccak256(ct.serialize())
 	}
 	return common.BytesToHash(ct.hash)
+}
+
+func (ct *tfheCiphertext) availableForOps() bool {
+	return (ct.initialized() && ct.ptr != nil && !ct.random)
+}
+
+func (ct *tfheCiphertext) initialized() bool {
+	return (ct.ptr != nil || ct.random)
 }
 
 func clientKeyEncrypt(value uint64) []byte {
