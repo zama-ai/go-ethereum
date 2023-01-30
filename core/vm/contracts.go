@@ -1113,6 +1113,11 @@ type tomlConfigOptions struct {
 		Verify           bool
 		VerifyRPCAddress string
 	}
+
+	Tfhe struct {
+		CiphertextsToGarbageCollect           uint64
+		CiphertextsGarbageCollectIntervalSecs uint64
+	}
 }
 
 var tomlConfig tomlConfigOptions
@@ -1299,13 +1304,19 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	if !accessibleState.Interpreter().evm.Commit {
 		return importRandomCiphertext(accessibleState), nil
 	}
-	var err error
-	ctBytes, err := verifyZkProof(input)
-	if err != nil {
-		return nil, err
+	var ctBytes []byte
+	if !tomlConfig.Zk.Verify {
+		// For testing: if input size <= `ciphertextSize`, treat the whole input as ciphertext.
+		ctBytes = input[0:minInt(ciphertextSize, len(input))]
+	} else {
+		var err error
+		ctBytes, err = verifyZkProof(input)
+		if err != nil {
+			return nil, err
+		}
 	}
 	ct := new(tfheCiphertext)
-	err = ct.deserialize(ctBytes)
+	err := ct.deserialize(ctBytes)
 	if err != nil {
 		return nil, err
 	}

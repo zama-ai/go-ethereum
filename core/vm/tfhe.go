@@ -133,6 +133,8 @@ import (
 	"errors"
 	"os"
 	"runtime"
+	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -161,6 +163,19 @@ var cks unsafe.Pointer
 var networkKeysDir string
 var usersKeysDir string
 
+var allocatedCiphertexts uint64
+
+// TODO: We assume that contracts.go's init() runs before the init() in this file,
+// making the TOML configuration available here.
+func runGc() {
+	for range time.Tick(time.Duration(tomlConfig.Tfhe.CiphertextsGarbageCollectIntervalSecs) * time.Second) {
+		if atomic.LoadUint64(&allocatedCiphertexts) >= tomlConfig.Tfhe.CiphertextsToGarbageCollect {
+			atomic.StoreUint64(&allocatedCiphertexts, 0)
+			runtime.GC()
+		}
+	}
+}
+
 func init() {
 	home := homeDir()
 	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
@@ -178,6 +193,8 @@ func init() {
 
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
 	cks = C.deserialize_client_key(toBufferView(cks_bytes))
+
+	go runGc()
 }
 
 type tfheCiphertext struct {
@@ -266,6 +283,7 @@ func (ct *tfheCiphertext) setPtr(ptr unsafe.Pointer) {
 		panic("setPtr called with nil")
 	}
 	ct.ptr = ptr
+	atomic.AddUint64(&allocatedCiphertexts, 1)
 	runtime.SetFinalizer(ct, func(ct *tfheCiphertext) {
 		C.destroy_tfhe_ciphertext(ct.ptr)
 	})
