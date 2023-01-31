@@ -1122,6 +1122,7 @@ type tomlConfigOptions struct {
 
 var tomlConfig tomlConfigOptions
 
+//lint:ignore U1000 Want to keep to show how Ed25519 keys were generated.
 func generateEd25519Keys() error {
 	public, private, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -1397,11 +1398,6 @@ type requireMessage struct {
 func requireKey(ciphertext []byte) string {
 	// Take the Keccak256 and remove the leading 0x.
 	return crypto.Keccak256Hash(ciphertext).Hex()[2:]
-}
-
-func requireKeyFromHash(hash common.Hash) string {
-	// Take the hash and remove the leading 0x.
-	return hash.Hex()[2:]
 }
 
 func requireURL(key *string) string {
