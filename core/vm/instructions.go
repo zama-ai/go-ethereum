@@ -393,16 +393,21 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 // opExtCodeHash returns the code hash of a specified account.
 // There are several cases when the function is called, while we can relay everything
 // to `state.GetCodeHash` function to ensure the correctness.
-//   (1) Caller tries to get the code hash of a normal contract account, state
+//
+//	(1) Caller tries to get the code hash of a normal contract account, state
+//
 // should return the relative code hash and set it as the result.
 //
-//   (2) Caller tries to get the code hash of a non-existent account, state should
+//	(2) Caller tries to get the code hash of a non-existent account, state should
+//
 // return common.Hash{} and zero will be set as the result.
 //
-//   (3) Caller tries to get the code hash for an account without contract code,
+//	(3) Caller tries to get the code hash for an account without contract code,
+//
 // state should return emptyCodeHash(0xc5d246...) as the result.
 //
-//   (4) Caller tries to get the code hash of a precompiled account, the result
+//	(4) Caller tries to get the code hash of a precompiled account, the result
+//
 // should be zero or emptyCodeHash.
 //
 // It is worth noting that in order to avoid unnecessary create and clean,
@@ -411,10 +416,12 @@ func opExtCodeCopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext)
 // If the precompile account is not transferred any amount on a private or
 // customized chain, the return value will be zero.
 //
-//   (5) Caller tries to get the code hash for an account which is marked as suicided
+//	(5) Caller tries to get the code hash for an account which is marked as suicided
+//
 // in the current transaction, the code hash of this account should be returned.
 //
-//   (6) Caller tries to get the code hash for an account which is marked as deleted,
+//	(6) Caller tries to get the code hash for an account which is marked as deleted,
+//
 // this account should be regarded as a non-existent account and zero should be returned.
 func opExtCodeHash(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	slot := scope.Stack.peek()
@@ -571,7 +578,12 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		if alreadyVerified {
 			verifiedCt.depth = minInt(verifiedCt.depth, interpreter.evm.depth)
 		} else {
-			verifiedCt = &verifiedCiphertext{interpreter.evm.depth, ctBytes}
+			tfheCt := new(tfheCiphertext)
+			err := tfheCt.deserialize(ctBytes)
+			if err != nil {
+				panic(err)
+			}
+			verifiedCt = &verifiedCiphertext{interpreter.evm.depth, tfheCt}
 		}
 		interpreter.verifiedCiphertexts[val] = verifiedCt
 	}
@@ -600,12 +612,13 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 	if metadataInt.IsZero() {
 		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
 		metadata.refCount = 1
-		metadata.length = uint64(len(verifiedCiphertext.ciphertext))
+		metadata.length = uint64(ciphertextSize)
 		ciphertextSlot := newInt(val.Bytes())
 		ciphertextSlot.AddUint64(ciphertextSlot, 1)
 		ctPart32 := make([]byte, 32)
 		partIdx := 0
-		for i, b := range verifiedCiphertext.ciphertext {
+		ctBytes := verifiedCiphertext.ciphertext.serialize()
+		for i, b := range ctBytes {
 			if i%32 == 0 && i != 0 {
 				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
 				ciphertextSlot.AddUint64(ciphertextSlot, 1)
