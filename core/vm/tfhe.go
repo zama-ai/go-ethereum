@@ -73,6 +73,14 @@ void* tfhe_sub(void* sks, void* ct1, void* ct2)
 	return result;
 }
 
+void* tfhe_mul(void* sks, void* ct1, void* ct2)
+{
+	ShortintCiphertext *result = NULL;
+	const int r = shortint_bc_server_key_smart_mul(sks, ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* tfhe_lte(void* sks, void* ct1, void* ct2)
 {
 	ShortintCiphertext *result = NULL;
@@ -268,6 +276,15 @@ func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) *tfheCiphertext {
 	}
 	res := new(tfheCiphertext)
 	res.setPtr(C.tfhe_sub(sks, lhs.ptr, rhs.ptr))
+	return res
+}
+
+func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) *tfheCiphertext {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot mul on a non-initialized ciphertext")
+	}
+	res := new(tfheCiphertext)
+	res.setPtr(C.tfhe_mul(sks, lhs.ptr, rhs.ptr))
 	return res
 }
 

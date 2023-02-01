@@ -86,6 +86,21 @@ func TestTfheSub(t *testing.T) {
 	}
 }
 
+func TestTfheMul(t *testing.T) {
+	a := uint64(2)
+	b := uint64(1)
+	expected := uint64(2)
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b)
+	ctRes := ctA.mul(ctB)
+	res := ctRes.decrypt()
+	if res != expected {
+		t.Fatalf("%d != %d", expected, res)
+	}
+}
+
 func TestTfheLte(t *testing.T) {
 	a := uint64(2)
 	b := uint64(1)
