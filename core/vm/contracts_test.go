@@ -499,6 +499,31 @@ func TestFheSub(t *testing.T) {
 	}
 }
 
+func TestFheMul(t *testing.T) {
+	c := &fheMul{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.Commit = true
+	addr := common.Address{}
+	readOnly := false
+	_, lhs_hash := verifyCiphertextInTestState(state.interpreter, 2, depth)
+	_, rhs_hash := verifyCiphertextInTestState(state.interpreter, 1, depth)
+	input := toPrecompileInput(lhs_hash, rhs_hash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res, exists := state.interpreter.verifiedCiphertexts[common.BytesToHash(out)]
+	if !exists {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted := res.ciphertext.decrypt()
+	if decrypted != 2 {
+		t.Fatalf("invalid decrypted result")
+	}
+}
+
 func TestFheLte(t *testing.T) {
 	c := &fheLte{}
 	depth := 1
