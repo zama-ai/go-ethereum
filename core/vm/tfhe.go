@@ -89,6 +89,14 @@ void* tfhe_lte(void* sks, void* ct1, void* ct2)
 	return result;
 }
 
+void* tfhe_lt(void* sks, void* ct1, void* ct2)
+{
+	ShortintCiphertext *result = NULL;
+	const int r = shortint_bc_server_key_smart_less(sks, ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
 uint64_t decrypt(void* cks, void* ct)
 {
 	uint64_t res = 0;
@@ -294,6 +302,15 @@ func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) *tfheCiphertext {
 	}
 	res := new(tfheCiphertext)
 	res.setPtr(C.tfhe_lte(sks, lhs.ptr, rhs.ptr))
+	return res
+}
+
+func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) *tfheCiphertext {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot lt on a non-initialized ciphertext")
+	}
+	res := new(tfheCiphertext)
+	res.setPtr(C.tfhe_lt(sks, lhs.ptr, rhs.ptr))
 	return res
 }
 

@@ -72,6 +72,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
+	common.BytesToAddress([]byte{73}): &fheLt{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -95,6 +96,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
+	common.BytesToAddress([]byte{73}): &fheLt{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -119,6 +121,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
+	common.BytesToAddress([]byte{73}): &fheLt{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -143,6 +146,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
+	common.BytesToAddress([]byte{73}): &fheLt{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -167,6 +171,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
+	common.BytesToAddress([]byte{73}): &fheLt{},
 }
 
 var (
@@ -1239,8 +1244,8 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
-	// If we are not committing state, skip execution and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState), nil
 	}
 
@@ -1306,8 +1311,8 @@ func verifyZkProof(input []byte) ([]byte, error) {
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	// If we are not committing state, skip verificaton and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState), nil
 	}
 	var ctBytes []byte
@@ -1521,8 +1526,8 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
-	// If we are not committing state, skip execution and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState), nil
 	}
 
@@ -1565,8 +1570,8 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
-	// If we are not committing state, skip execution and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState), nil
 	}
 
@@ -1609,8 +1614,8 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
-	// If we are not committing state, skip execution and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState), nil
 	}
 
@@ -1622,6 +1627,50 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	// TODO: for testing
 	err := os.WriteFile("/tmp/mul_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	ctHash := result.getHash()
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
+
+	return ctHash[:], nil
+}
+
+type fheLt struct{}
+
+func (e *fheLt) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if len(input) != 64 {
+		return nil, errors.New("input needs to contain two 256-bit sized values")
+	}
+
+	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if !exists {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if !exists {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState), nil
+	}
+
+	result := lhsCt.lt(rhsCt)
+	verifiedCiphertext := &verifiedCiphertext{
+		depth:      accessibleState.Interpreter().evm.depth,
+		ciphertext: result,
+	}
+
+	// TODO: for testing
+	err := os.WriteFile("/tmp/lt_result", verifiedCiphertext.ciphertext.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
