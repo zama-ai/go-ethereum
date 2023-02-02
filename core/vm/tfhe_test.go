@@ -119,3 +119,21 @@ func TestTfheLte(t *testing.T) {
 		t.Fatalf("%d != %d", 0, res2)
 	}
 }
+func TestTfheLt(t *testing.T) {
+	a := uint64(2)
+	b := uint64(1)
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b)
+	ctRes1 := ctA.lte(ctB)
+	ctRes2 := ctB.lte(ctA)
+	res1 := ctRes1.decrypt()
+	res2 := ctRes2.decrypt()
+	if res1 != 0 {
+		t.Fatalf("%d != %d", 0, res1)
+	}
+	if res2 != 1 {
+		t.Fatalf("%d != %d", 0, res2)
+	}
+}

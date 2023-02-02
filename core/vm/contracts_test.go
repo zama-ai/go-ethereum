@@ -566,6 +566,48 @@ func TestFheLte(t *testing.T) {
 	}
 }
 
+func TestFheLt(t *testing.T) {
+	c := &fheLt{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.Commit = true
+	addr := common.Address{}
+	readOnly := false
+	_, lhs_hash := verifyCiphertextInTestState(state.interpreter, 2, depth)
+	_, rhs_hash := verifyCiphertextInTestState(state.interpreter, 1, depth)
+
+	// 2 < 1
+	input1 := toPrecompileInput(lhs_hash, rhs_hash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res, exists := state.interpreter.verifiedCiphertexts[common.BytesToHash(out)]
+	if !exists {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted := res.ciphertext.decrypt()
+	if decrypted != 0 {
+		t.Fatalf("invalid decrypted result")
+	}
+
+	// 1 < 2
+	input2 := toPrecompileInput(rhs_hash, lhs_hash)
+	out, err = c.Run(state, addr, addr, input2, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res, exists = state.interpreter.verifiedCiphertexts[common.BytesToHash(out)]
+	if !exists {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted = res.ciphertext.decrypt()
+	if decrypted != 1 {
+		t.Fatalf("invalid decrypted result")
+	}
+}
+
 func TestUnknownCiphertextHandle(t *testing.T) {
 	depth := 1
 	state := newTestState()
