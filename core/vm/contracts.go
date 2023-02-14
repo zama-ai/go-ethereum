@@ -1718,8 +1718,14 @@ func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.A
 		return importRandomCiphertext(accessibleState), nil
 	}
 
+	// Get the RNG nonce.
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(caller)
 	currentRngNonceBytes := accessibleState.Interpreter().evm.StateDB.GetState(protectedStorage, rngNonceKey).Bytes()
+
+	// Increment the RNG nonce by 1.
+	nextRngNonce := newInt(currentRngNonceBytes)
+	nextRngNonce = nextRngNonce.AddUint64(nextRngNonce, 1)
+	accessibleState.Interpreter().evm.StateDB.SetState(protectedStorage, rngNonceKey, nextRngNonce.Bytes32())
 
 	// Compute the seed and use it to create a new cipher.
 	hasher := crypto.NewKeccakState()
@@ -1761,10 +1767,5 @@ func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.A
 	}
 	ctHash := randCt.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
-
-	// Increment the RNG nonce by 1.
-	rngNonce := newInt(currentRngNonceBytes)
-	rngNonce = rngNonce.AddUint64(rngNonce, 1)
-	accessibleState.Interpreter().evm.StateDB.SetState(protectedStorage, rngNonceKey, rngNonce.Bytes32())
 	return ctHash[:], nil
 }
