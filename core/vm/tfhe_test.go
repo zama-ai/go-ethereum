@@ -137,3 +137,54 @@ func TestTfheLt(t *testing.T) {
 		t.Fatalf("%d != %d", 0, res2)
 	}
 }
+
+func TestTfheTrivialEncryptDecrypt(t *testing.T) {
+	val := uint64(2)
+	ct := new(tfheCiphertext)
+	ct.trivialEncrypt(val)
+	res := ct.decrypt()
+	if res != val {
+		t.Fatalf("%d != %d", val, res)
+	}
+}
+
+func TestTfheTrivialAndEncryptedLte(t *testing.T) {
+	a := uint64(2)
+	b := uint64(1)
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a)
+	ctB := new(tfheCiphertext)
+	ctB.trivialEncrypt(b)
+	ctRes1 := ctA.lte(ctB)
+	ctRes2 := ctB.lte(ctA)
+	res1 := ctRes1.decrypt()
+	res2 := ctRes2.decrypt()
+	if res1 != 0 {
+		t.Fatalf("%d != %d", 0, res1)
+	}
+	if res2 != 1 {
+		t.Fatalf("%d != %d", 0, res2)
+	}
+}
+
+func TestTfheTrivialAndEncryptedAdd(t *testing.T) {
+	a := uint64(1)
+	b := uint64(1)
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a)
+	ctB := new(tfheCiphertext)
+	ctB.trivialEncrypt(b)
+	ctRes := ctA.add(ctB)
+	res := ctRes.decrypt()
+	if res != 2 {
+		t.Fatalf("%d != %d", 0, res)
+	}
+}
+
+func TestTfheTrivialSerializeSize(t *testing.T) {
+	ct := new(tfheCiphertext)
+	ct.trivialEncrypt(2)
+	if len(ct.serialize()) != ciphertextSize {
+		t.Fatalf("serialization of trivially encrypted unexpected size")
+	}
+}

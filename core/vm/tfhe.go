@@ -143,6 +143,16 @@ void public_key_encrypt(BufferView pks_buf, uint64_t value, Buffer* out)
 	destroy_shortint_public_key(pks);
 	destroy_shortint_ciphertext(ct);
 }
+
+void* trivial_encrypt(void* sks, uint64_t value) {
+	ShortintCiphertext *ct = NULL;
+
+	const int r = shortint_bc_server_key_create_trivial(sks, value, &ct);
+	assert(r == 0);
+
+	return ct;
+}
+
 */
 import "C"
 import (
@@ -254,6 +264,14 @@ func (ct *tfheCiphertext) makeRandom() {
 	ct.serialization = make([]byte, ciphertextSize)
 	rand.Read(ct.serialization)
 	ct.random = true
+}
+
+func (ct *tfheCiphertext) trivialEncrypt(value uint64) {
+	if ct.initialized() {
+		panic("cannot trivially encrypt to an existing ciphertext")
+	}
+	ct.setPtr(C.trivial_encrypt(sks, C.ulong(value)))
+	ct.value = &value
 }
 
 func (ct *tfheCiphertext) serialize() []byte {

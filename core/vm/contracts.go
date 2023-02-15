@@ -40,6 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/naoina/toml"
+	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -73,6 +74,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
+	common.BytesToAddress([]byte{74}): &fheRand{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -97,6 +99,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
+	common.BytesToAddress([]byte{74}): &fheRand{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -122,6 +125,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
+	common.BytesToAddress([]byte{74}): &fheRand{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -147,6 +151,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
+	common.BytesToAddress([]byte{74}): &fheRand{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -172,6 +177,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
+	common.BytesToAddress([]byte{74}): &fheRand{},
 }
 
 var (
@@ -1678,5 +1684,88 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 	ctHash := result.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 
+	return ctHash[:], nil
+}
+
+type fheRand struct{}
+
+var globalRngSeed []byte
+
+var rngNonceKey [32]byte = uint256.NewInt(0).Bytes32()
+
+func init() {
+	if chacha20.NonceSizeX != 24 {
+		panic("expected 24 bytes for NonceSizeX")
+	}
+
+	// TODO: Since the current implementation is not FHE-based and, hence, not private,
+	// we just initialize the global seed with non-random public data. We will change
+	// that once the FHE version is available.
+	globalRngSeed = make([]byte, chacha20.KeySize)
+	for i := range globalRngSeed {
+		globalRngSeed[i] = byte(1 + i)
+	}
+}
+
+func (e *fheRand) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState), nil
+	}
+
+	// Get the RNG nonce.
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(caller)
+	currentRngNonceBytes := accessibleState.Interpreter().evm.StateDB.GetState(protectedStorage, rngNonceKey).Bytes()
+
+	// Increment the RNG nonce by 1.
+	nextRngNonce := newInt(currentRngNonceBytes)
+	nextRngNonce = nextRngNonce.AddUint64(nextRngNonce, 1)
+	accessibleState.Interpreter().evm.StateDB.SetState(protectedStorage, rngNonceKey, nextRngNonce.Bytes32())
+
+	// Compute the seed and use it to create a new cipher.
+	hasher := crypto.NewKeccakState()
+	hasher.Write(globalRngSeed)
+	hasher.Write(caller.Bytes())
+	hasher.Write(currentRngNonceBytes)
+	seed := common.Hash{}
+	_, err := hasher.Read(seed[:])
+	if err != nil {
+		return nil, err
+	}
+	// The RNG nonce bytes are of size chacha20.NonceSizeX, which is assumed to be 24 bytes (see init() above).
+	// Since uint256.Int.z[0] is the least significant byte and since uint256.Int.Bytes32() serializes
+	// in order of z[3], z[2], z[1], z[0], we want to essentially ignore the first byte, i.e. z[3], because
+	// it will always be 0 as the nonce size is 24.
+	cipher, err := chacha20.NewUnauthenticatedCipher(seed.Bytes(), currentRngNonceBytes[32-chacha20.NonceSizeX:32])
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: The amount of bytes depends on the ciphertext parameters. For now, get 1 random byte only
+	// and do mod 8 for use with MSG3/CARRY3 plaintexts.
+	randBytes := make([]byte, 1)
+	// XOR a byte array of 0s with the stream from the cipher and receive the result in the same array.
+	cipher.XORKeyStream(randBytes, randBytes)
+	randValue := uint64(randBytes[0]) % 8
+
+	// Trivially encrypt the random value.
+	randCt := new(tfheCiphertext)
+	randCt.trivialEncrypt(randValue)
+	verifiedCiphertext := &verifiedCiphertext{
+		depth:      accessibleState.Interpreter().evm.depth,
+		ciphertext: randCt,
+	}
+	// TODO: for testing
+	err = os.WriteFile("/tmp/rand_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	if err != nil {
+		return nil, err
+	}
+	ctHash := randCt.getHash()
+	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 	return ctHash[:], nil
 }
