@@ -69,6 +69,8 @@ type EVMInterpreter struct {
 	returnData []byte // Last CALL's return data for subsequent reuse
 
 	verifiedCiphertexts map[common.Hash]*verifiedCiphertext // A map from a ciphertext hash to itself and stack depth at which it is verified
+
+	optimisticRequire *tfheCiphertext // Product of all optimistic requires encountered during execution
 }
 
 // NewEVMInterpreter returns a new instance of the Interpreter.
@@ -253,6 +255,15 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 
 	if err == errStopToken {
 		err = nil // clear stop token error
+
+		// If we are finishing execution (about to go to from depth 1 to depth 0) and there
+		// is an optimistic require, check its decrypted value. If false, return as if
+		// execution is to be reverted.
+		if in.evm.depth == 1 && in.optimisticRequire != nil {
+			if !evaluateRequire(in.optimisticRequire) {
+				err = ErrExecutionReverted
+			}
+		}
 	}
 
 	return res, err
