@@ -75,6 +75,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
+	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -100,6 +101,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
+	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -126,6 +128,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
+	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -152,6 +155,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
+	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -178,6 +182,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
+	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 }
 
 var (
@@ -1472,6 +1477,30 @@ func getRequire(ciphertext []byte) (bool, error) {
 	return false, errors.New("invalid require signature")
 }
 
+func evaluateRequire(ct *tfheCiphertext) bool {
+	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
+	case "oracle":
+		requireValue := ct.decrypt()
+		if err := putRequire(ct.serialize(), requireValue != 0); err != nil {
+			panic(err)
+		}
+		if requireValue == 0 {
+			return false
+		}
+		return true
+	case "node":
+		requireValue, err := getRequire(ct.serialize())
+		if err != nil {
+			panic(err)
+		}
+		if !requireValue {
+			return false
+		}
+		return true
+	}
+	panic(errors.New("unimplemented require mode"))
+}
+
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if accessibleState.Interpreter().evm.EthCall {
 		return nil, errors.New("require not supported in read-only commands")
@@ -1488,27 +1517,45 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	if !ok {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
-	case "oracle":
-		requireValue := ct.ciphertext.decrypt()
-		if err := putRequire(ct.ciphertext.serialize(), requireValue != 0); err != nil {
-			return nil, err
-		}
-		if requireValue == 0 {
-			return nil, errors.New("require value of 0")
-		}
-		return nil, nil
-	case "node":
-		requireValue, err := getRequire(ct.ciphertext.serialize())
-		if err != nil {
-			return nil, err
-		}
-		if !requireValue {
-			return nil, errors.New("require value of 0")
-		}
+	if !evaluateRequire(ct.ciphertext) {
+		return nil, ErrExecutionReverted
+	}
+	return nil, nil
+}
+
+type optimisticRequire struct{}
+
+func (e *optimisticRequire) RequiredGas(input []byte) uint64 {
+	// TODO
+	return 8
+}
+
+func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if accessibleState.Interpreter().evm.EthCall {
+		return nil, errors.New("optimistic require not supported in read-only commands")
+	}
+	if len(input) != 32 {
+		return nil, errors.New("invalid ciphertext handle")
+	}
+	// If we are not committing to state, assume the require is true, avoiding any side effects
+	// (i.e. mutatiting the oracle DB).
+	if !accessibleState.Interpreter().evm.Commit {
 		return nil, nil
 	}
-	return nil, errors.New("unimplemented require mode")
+	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
+	if !ok {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+	// If this is the first optimistic require, just assign it.
+	// If there is already an optimistic one, just multiply it with the incoming one. Here, we assume
+	// that ciphertexts have value of either 0 or 1. Thus, multiplying all optimistic requires leads to
+	// one optimistic require at the end that we decrypt when we are about to finish execution.
+	if accessibleState.Interpreter().optimisticRequire == nil {
+		accessibleState.Interpreter().optimisticRequire = ct.ciphertext
+	} else {
+		accessibleState.Interpreter().optimisticRequire = accessibleState.Interpreter().optimisticRequire.mul(ct.ciphertext)
+	}
+	return nil, nil
 }
 
 type fheLte struct{}
