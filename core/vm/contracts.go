@@ -1126,13 +1126,15 @@ func (c *bls12381MapG2) Run(accessibleState PrecompileAccessibleState, caller co
 
 type tomlConfigOptions struct {
 	Oracle struct {
-		Mode            string
-		OracleDBAddress string
+		Mode              string
+		OracleDBAddress   string
+		RequireRetryCount uint8
 	}
 
 	Zk struct {
 		Verify           bool
 		VerifyRPCAddress string
+		VerifyRetryCount uint8
 	}
 
 	Tfhe struct {
@@ -1308,25 +1310,30 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 // Returns the verified ciphertext on success or nil on invalid ZK proof.
 // Exits the process on errors.
 func verifyZkProof(input []byte) []byte {
-	req, err := http.NewRequest(http.MethodPost, tomlConfig.Zk.VerifyRPCAddress, bytes.NewReader(input))
-	if err != nil {
-		exitProcess()
+	for try := uint8(1); try <= tomlConfig.Zk.VerifyRetryCount+1; try++ {
+		req, err := http.NewRequest(http.MethodPost, tomlConfig.Zk.VerifyRPCAddress, bytes.NewReader(input))
+		if err != nil {
+			continue
+		}
+		req.Header.Add("Content-Type", "application/msgpack")
+		resp, err := zkHttpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		// The ZKPoK service returns 406 if the proof is incorrect.
+		if resp.StatusCode == 406 {
+			return nil
+		} else if resp.StatusCode != 200 {
+			continue
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			continue
+		}
+		return body
 	}
-	req.Header.Add("Content-Type", "application/msgpack")
-	resp, err := zkHttpClient.Do(req)
-	if err != nil {
-		exitProcess()
-	}
-	if resp.StatusCode == 406 {
-		return nil
-	} else if resp.StatusCode != 200 {
-		exitProcess()
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		exitProcess()
-	}
-	return body
+	exitProcess()
+	return nil
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1442,17 +1449,21 @@ func putRequire(ct *tfheCiphertext) bool {
 	if err != nil {
 		exitProcess()
 	}
-	req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
-	if err != nil {
-		exitProcess()
+	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
+		req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
+		if err != nil {
+			continue
+		}
+		resp, err := requireHttpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		if resp.StatusCode != 200 {
+			continue
+		}
+		return value
 	}
-	resp, err := requireHttpClient.Do(req)
-	if err != nil {
-		exitProcess()
-	}
-	if resp.StatusCode != 200 {
-		exitProcess()
-	}
+	exitProcess()
 	return value
 }
 
@@ -1461,34 +1472,38 @@ func putRequire(ct *tfheCiphertext) bool {
 func getRequire(ct *tfheCiphertext) bool {
 	ciphertext := ct.serialize()
 	key := requireKey(ciphertext)
-	req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
-	if err != nil {
-		exitProcess()
+	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
+		req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
+		if err != nil {
+			continue
+		}
+		resp, err := requireHttpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		if resp.StatusCode != 200 {
+			continue
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			continue
+		}
+		msg := requireMessage{}
+		if err := json.Unmarshal(body, &msg); err != nil {
+			continue
+		}
+		b := requireBytesToSign(ciphertext, msg.Value)
+		s, err := hex.DecodeString(msg.Signature)
+		if err != nil {
+			continue
+		}
+		if !ed25519.Verify(publicSignatureKey, b, s) {
+			continue
+		}
+		return msg.Value
 	}
-	resp, err := requireHttpClient.Do(req)
-	if err != nil {
-		exitProcess()
-	}
-	if resp.StatusCode != 200 {
-		exitProcess()
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		exitProcess()
-	}
-	msg := requireMessage{}
-	if err := json.Unmarshal(body, &msg); err != nil {
-		exitProcess()
-	}
-	b := requireBytesToSign(ciphertext, msg.Value)
-	s, err := hex.DecodeString(msg.Signature)
-	if err != nil {
-		exitProcess()
-	}
-	if !ed25519.Verify(publicSignatureKey, b, s) {
-		exitProcess()
-	}
-	return msg.Value
+	exitProcess()
+	return false
 }
 
 func evaluateRequire(ct *tfheCiphertext) bool {
