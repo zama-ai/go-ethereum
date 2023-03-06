@@ -1,6 +1,6 @@
 #!/bin/bash
 
-git clone git@github.com:zama-ai/tfhe-rs.git
+git clone https://github.com/zama-ai/tfhe-rs.git
 mkdir -p core/vm/lib
 cd tfhe-rs
 git checkout blockchain-demo-deterministic-fft
