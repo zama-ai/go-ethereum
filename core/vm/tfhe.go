@@ -168,7 +168,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const ciphertextSize = 7008
+const ciphertextSize = 8248
 
 func toBufferView(in []byte) C.BufferView {
 	return C.BufferView{
