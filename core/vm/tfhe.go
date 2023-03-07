@@ -153,6 +153,15 @@ void* trivial_encrypt(void* sks, uint64_t value) {
 	return ct;
 }
 
+size_t get_message_modulus(void* cks) {
+	size_t modulus = 0;
+
+	const int r = shortint_client_key_get_message_modulus(cks, &modulus);
+	assert(r == 0);
+
+	return modulus;
+}
+
 */
 import "C"
 import (
@@ -168,8 +177,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const ciphertextSize = 8248
-
 func toBufferView(in []byte) C.BufferView {
 	return C.BufferView{
 		pointer: (*C.uchar)(unsafe.Pointer(&in[0])),
@@ -184,6 +191,12 @@ func homeDir() string {
 	}
 	return home
 }
+
+// The TFHE ciphertext size, in bytes.
+var fheCiphertextSize int
+
+// The TFHE message modulus. Extracted from the `cks`.
+var fheMessageModulus uint64
 
 var sks unsafe.Pointer
 var cks unsafe.Pointer
@@ -220,6 +233,14 @@ func init() {
 
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
 	cks = C.deserialize_client_key(toBufferView(cks_bytes))
+
+	// Use trivial encryption to determine the ciphertext size for the used parameters.
+	// Note: parameters are embedded in the client `cks` key.
+	ct := new(tfheCiphertext)
+	ct.trivialEncrypt(1)
+	fheCiphertextSize = len(ct.serialize())
+
+	fheMessageModulus = uint64(C.get_message_modulus(cks))
 
 	go runGc()
 }
@@ -261,7 +282,7 @@ func (ct *tfheCiphertext) makeRandom() {
 	if ct.initialized() {
 		panic("cannot make an existing ciphertext random")
 	}
-	ct.serialization = make([]byte, ciphertextSize)
+	ct.serialization = make([]byte, fheCiphertextSize)
 	rand.Read(ct.serialization)
 	ct.random = true
 }
