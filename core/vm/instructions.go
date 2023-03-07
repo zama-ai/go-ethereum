@@ -612,7 +612,7 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 	if metadataInt.IsZero() {
 		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
 		metadata.refCount = 1
-		metadata.length = uint64(ciphertextSize)
+		metadata.length = uint64(fheCiphertextSize)
 		ciphertextSlot := newInt(val.Bytes())
 		ciphertextSlot.AddUint64(ciphertextSlot, 1)
 		ctPart32 := make([]byte, 32)

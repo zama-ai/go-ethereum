@@ -1343,8 +1343,8 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	}
 	var ctBytes []byte
 	if !tomlConfig.Zk.Verify {
-		// For testing: if input size <= `ciphertextSize`, treat the whole input as ciphertext.
-		ctBytes = input[0:minInt(ciphertextSize, len(input))]
+		// For testing: if input size <= `fheCiphertextSize`, treat the whole input as ciphertext.
+		ctBytes = input[0:minInt(fheCiphertextSize, len(input))]
 	} else {
 		ctBytes = verifyZkProof(input)
 		if ctBytes == nil {
@@ -1809,16 +1809,14 @@ func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.A
 		return nil, err
 	}
 
-	// TODO: The amount of bytes depends on the ciphertext parameters. For now, get 1 random byte only
-	// and do mod 8 for use with MSG3/CARRY3 plaintexts.
-	randBytes := make([]byte, 1)
 	// XOR a byte array of 0s with the stream from the cipher and receive the result in the same array.
+	randBytes := make([]byte, 8)
 	cipher.XORKeyStream(randBytes, randBytes)
-	randValue := uint64(randBytes[0]) % 8
 
-	// Trivially encrypt the random value.
+	// Trivially encrypt the random integer.
+	randInt := binary.BigEndian.Uint64(randBytes) % fheMessageModulus
 	randCt := new(tfheCiphertext)
-	randCt.trivialEncrypt(randValue)
+	randCt.trivialEncrypt(randInt)
 	verifiedCiphertext := &verifiedCiphertext{
 		depth:      accessibleState.Interpreter().evm.depth,
 		ciphertext: randCt,

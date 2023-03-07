@@ -184,7 +184,7 @@ func TestTfheTrivialAndEncryptedAdd(t *testing.T) {
 func TestTfheTrivialSerializeSize(t *testing.T) {
 	ct := new(tfheCiphertext)
 	ct.trivialEncrypt(2)
-	if len(ct.serialize()) != ciphertextSize {
+	if len(ct.serialize()) != fheCiphertextSize {
 		t.Fatalf("serialization of trivially encrypted unexpected size")
 	}
 }

@@ -713,7 +713,7 @@ func (c testCallerAddress) Address() common.Address {
 func newTestScopeConext() *ScopeContext {
 	c := new(ScopeContext)
 	c.Memory = NewMemory()
-	c.Memory.Resize(ciphertextSize * 3)
+	c.Memory.Resize(uint64(fheCiphertextSize) * 3)
 	c.Stack = newstack()
 	c.Contract = NewContract(testCallerAddress{}, testContractAddress{}, big.NewInt(10), 100000)
 	return c
