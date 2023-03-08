@@ -574,18 +574,18 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 			ctBytes = append(ctBytes, bytes[0:toAppend]...)
 			protectedSlotIdx.AddUint64(protectedSlotIdx, 1)
 		}
-		verifiedCt, alreadyVerified := interpreter.verifiedCiphertexts[val]
-		if alreadyVerified {
-			verifiedCt.depth = minInt(verifiedCt.depth, interpreter.evm.depth)
+		var ct *tfheCiphertext
+		verifiedCt := getVerifiedCiphertextFromEVM(interpreter, val)
+		if verifiedCt != nil {
+			ct = verifiedCt.ciphertext
 		} else {
-			tfheCt := new(tfheCiphertext)
-			err := tfheCt.deserialize(ctBytes)
+			ct = new(tfheCiphertext)
+			err := ct.deserialize(ctBytes)
 			if err != nil {
-				panic(err)
+				exitProcess()
 			}
-			verifiedCt = &verifiedCiphertext{interpreter.evm.depth, tfheCt}
 		}
-		interpreter.verifiedCiphertexts[val] = verifiedCt
+		importCiphertextToEVM(interpreter, ct)
 	}
 }
 
@@ -824,6 +824,15 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	return nil, nil
 }
 
+// If there are ciphertext handles in the arguments to a call, delegate them to the callee.
+func delegateCiphertextHandlesInArgs(interpreter *EVMInterpreter, args []byte) {
+	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
+		if contains(args, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
+			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth + 1)
+		}
+	}
+}
+
 func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	stack := scope.Stack
 	// Pop gas. The actual gas in interpreter.evm.callGasTemp.
@@ -847,6 +856,8 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 		gas += params.CallStipend
 		bigVal = value.ToBig()
 	}
+
+	delegateCiphertextHandlesInArgs(interpreter, args)
 
 	ret, returnGas, err := interpreter.evm.Call(scope.Contract, toAddr, args, gas, bigVal)
 
@@ -885,6 +896,8 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		bigVal = value.ToBig()
 	}
 
+	delegateCiphertextHandlesInArgs(interpreter, args)
+
 	ret, returnGas, err := interpreter.evm.CallCode(scope.Contract, toAddr, args, gas, bigVal)
 	if err != nil {
 		temp.Clear()
@@ -913,6 +926,8 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	toAddr := common.Address(addr.Bytes20())
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
+
+	delegateCiphertextHandlesInArgs(interpreter, args)
 
 	ret, returnGas, err := interpreter.evm.DelegateCall(scope.Contract, toAddr, args, gas)
 	if err != nil {
@@ -943,6 +958,8 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
+	delegateCiphertextHandlesInArgs(interpreter, args)
+
 	ret, returnGas, err := interpreter.evm.StaticCall(scope.Contract, toAddr, args, gas)
 	if err != nil {
 		temp.Clear()
@@ -965,13 +982,12 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	ret := scope.Memory.GetPtr(int64(offset.Uint64()), int64(size.Uint64()))
 
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
-		if contains(ret, key.Bytes()) {
+		if contains(ret, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
 			// If a handle is returned, automatically make it available to the caller.
-			verifiedCiphertext.depth = minInt(verifiedCiphertext.depth, interpreter.evm.depth-1)
-		} else if verifiedCiphertext.depth > interpreter.evm.depth-1 {
-			// Remove any ciphertexts that are not delegated for use by the caller.
-			delete(interpreter.verifiedCiphertexts, key)
+			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth - 1)
 		}
+		// Delete the current EVM depth. Do that after the `isVerifiedAtCurrentDepth()` check.
+		verifiedCiphertext.verifiedDepths.del(interpreter.evm.depth)
 	}
 
 	return ret, errStopToken
