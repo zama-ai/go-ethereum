@@ -1843,6 +1843,6 @@ func (e *faucet) RequiredGas(input []byte) uint64 {
 }
 
 func (e *faucet) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(1000000000000000000))
+	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(10000000000000000000))
 	return input, nil
 }
