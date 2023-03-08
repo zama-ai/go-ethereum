@@ -52,8 +52,20 @@ type keccakState interface {
 	Read([]byte) (int, error)
 }
 
+// A ciphertext is verified if from <= d and d == to, where d is the current EVM stack depth.
+type depthRange struct {
+	from int
+	to   int
+}
+
 type verifiedCiphertext struct {
-	depth      int
+	depthRanges []*depthRange // Ranges at which the ciphertext is verified.
+	ciphertext  *tfheCiphertext
+}
+
+// A ciphertext with a range at which it is verified for the current depth.
+type verifiedCiphertextAtDepth struct {
+	verifiedAt *depthRange
 	ciphertext *tfheCiphertext
 }
 

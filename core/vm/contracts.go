@@ -1215,24 +1215,63 @@ func init() {
 	}
 }
 
-func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) (*tfheCiphertext, bool) {
-	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[ciphertextHash]
-	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
-		return ct.ciphertext, true
+func isVerifiedAtCurrentDepth(interpreter *EVMInterpreter, ct *verifiedCiphertext) *depthRange {
+	currentDepth := interpreter.evm.depth
+	for _, r := range ct.depthRanges {
+		if r.from <= currentDepth && currentDepth == r.to {
+			return r
+		}
 	}
-	return nil, false
+	return nil
+}
+
+// Returns a pointer to the ciphertext if the given hash points to a verified ciphertext.
+// Else, it returns nil.
+func getVerifiedCiphertextFromEVM(interpreter *EVMInterpreter, ciphertextHash common.Hash) *verifiedCiphertextAtDepth {
+	ct, ok := interpreter.verifiedCiphertexts[ciphertextHash]
+	if ok {
+		dr := isVerifiedAtCurrentDepth(interpreter, ct)
+		if dr != nil {
+			return &verifiedCiphertextAtDepth{dr, ct.ciphertext}
+		}
+	}
+	return nil
+}
+
+// See getVerifiedCiphertextFromEVM().
+func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) *verifiedCiphertextAtDepth {
+	return getVerifiedCiphertextFromEVM(accessibleState.Interpreter(), ciphertextHash)
+}
+
+func importCiphertextToEVMAtDepth(interpreter *EVMInterpreter, ct *tfheCiphertext, depth int) *verifiedCiphertext {
+	existing, ok := interpreter.verifiedCiphertexts[ct.getHash()]
+	if ok {
+		existing.depthRanges = append(existing.depthRanges, &depthRange{depth, depth})
+		return existing
+	} else {
+		new := &verifiedCiphertext{
+			depthRanges: []*depthRange{{depth, depth}},
+			ciphertext:  ct,
+		}
+		interpreter.verifiedCiphertexts[ct.getHash()] = new
+		return new
+	}
+}
+
+func importCiphertextToEVM(interpreter *EVMInterpreter, ct *tfheCiphertext) *verifiedCiphertext {
+	return importCiphertextToEVMAtDepth(interpreter, ct, interpreter.evm.depth)
+}
+
+func importCiphertext(accessibleState PrecompileAccessibleState, ct *tfheCiphertext) *verifiedCiphertext {
+	return importCiphertextToEVM(accessibleState.Interpreter(), ct)
 }
 
 // Used when we want to skip FHE computation, e.g. gas estimation.
 func importRandomCiphertext(accessibleState PrecompileAccessibleState) []byte {
 	ct := new(tfheCiphertext)
 	ct.makeRandom()
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: ct,
-	}
+	importCiphertext(accessibleState, ct)
 	ctHash := ct.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 	return ctHash[:]
 }
 
@@ -1248,12 +1287,12 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	a, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if !exists {
+	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if lhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	b, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if !exists {
+	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if rhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1262,20 +1301,16 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState), nil
 	}
 
-	result := a.add(b)
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: result,
-	}
+	result := lhs.ciphertext.add(rhs.ciphertext)
+	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/add_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	err := os.WriteFile("/tmp/add_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	ctHash := verifiedCiphertext.ciphertext.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
+	ctHash := result.getHash()
 	return ctHash[:], nil
 }
 
@@ -1357,7 +1392,7 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 		return nil, err
 	}
 	ctHash := ct.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = &verifiedCiphertext{accessibleState.Interpreter().evm.depth, ct}
+	importCiphertext(accessibleState, ct)
 	return ctHash.Bytes(), nil
 }
 
@@ -1387,8 +1422,8 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
-	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
-	if ok && ct.depth <= accessibleState.Interpreter().evm.depth {
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct != nil {
 		decryptedValue := ct.ciphertext.decrypt()
 		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
 		if err != nil {
@@ -1410,9 +1445,9 @@ func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, call
 	if len(input) != 32 {
 		return nil, errors.New("invalid ciphertext handle")
 	}
-	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
-	if ok {
-		ct.depth = minInt(ct.depth, accessibleState.Interpreter().evm.depth-1)
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct != nil {
+		ct.verifiedAt.to++
 		return nil, nil
 	}
 	return nil, errors.New("unverified ciphertext handle")
@@ -1586,12 +1621,12 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if !exists {
+	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if lhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if !exists {
+	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if rhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1600,20 +1635,16 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState), nil
 	}
 
-	result := lhsCt.lte(rhsCt)
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: result,
-	}
+	result := lhs.ciphertext.lte(rhs.ciphertext)
+	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/lte_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	err := os.WriteFile("/tmp/lte_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
 	ctHash := result.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 
 	return ctHash[:], nil
 }
@@ -1630,12 +1661,12 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if !exists {
+	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if lhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if !exists {
+	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if rhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1644,20 +1675,16 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState), nil
 	}
 
-	result := lhsCt.sub(rhsCt)
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: result,
-	}
+	result := lhs.ciphertext.sub(rhs.ciphertext)
+	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/sub_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	err := os.WriteFile("/tmp/sub_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
 	ctHash := result.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 
 	return ctHash[:], nil
 }
@@ -1674,12 +1701,12 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if !exists {
+	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if lhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if !exists {
+	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if rhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1688,20 +1715,16 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState), nil
 	}
 
-	result := lhsCt.mul(rhsCt)
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: result,
-	}
+	result := lhs.ciphertext.mul(rhs.ciphertext)
+	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/mul_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	err := os.WriteFile("/tmp/mul_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
 	ctHash := result.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 
 	return ctHash[:], nil
 }
@@ -1718,12 +1741,12 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		return nil, errors.New("input needs to contain two 256-bit sized values")
 	}
 
-	lhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if !exists {
+	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if lhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
-	rhsCt, exists := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if !exists {
+	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if rhs == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
@@ -1732,20 +1755,16 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		return importRandomCiphertext(accessibleState), nil
 	}
 
-	result := lhsCt.lt(rhsCt)
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: result,
-	}
+	result := lhs.ciphertext.lt(rhs.ciphertext)
+	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/lt_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	err := os.WriteFile("/tmp/lt_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 
 	ctHash := result.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 
 	return ctHash[:], nil
 }
@@ -1817,16 +1836,13 @@ func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.A
 	randInt := binary.BigEndian.Uint64(randBytes) % fheMessageModulus
 	randCt := new(tfheCiphertext)
 	randCt.trivialEncrypt(randInt)
-	verifiedCiphertext := &verifiedCiphertext{
-		depth:      accessibleState.Interpreter().evm.depth,
-		ciphertext: randCt,
-	}
+	importCiphertext(accessibleState, randCt)
+
 	// TODO: for testing
-	err = os.WriteFile("/tmp/rand_result", verifiedCiphertext.ciphertext.serialize(), 0644)
+	err = os.WriteFile("/tmp/rand_result", randCt.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
 	ctHash := randCt.getHash()
-	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 	return ctHash[:], nil
 }

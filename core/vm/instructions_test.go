@@ -731,7 +731,8 @@ func TestProtectedStorageSstoreSload(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
 	interpreter := newTestInterpreter()
-	ct, ctHash := verifyCiphertextInTestState(interpreter, 2, depth)
+	ct := verifyCiphertextInTestMemory(interpreter, 2, depth)
+	ctHash := ct.getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)
 	value := uint256FromBig(ctHash.Big())
@@ -755,8 +756,8 @@ func TestProtectedStorageSstoreSload(t *testing.T) {
 	}
 
 	// Expect the ciphertext is verified after SLOAD.
-	ctAfterSload, found := interpreter.verifiedCiphertexts[ctHash]
-	if !found {
+	ctAfterSload := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+	if ctAfterSload == nil {
 		t.Fatalf("expected ciphertext is verified after sload")
 	}
 	if !bytes.Equal(ct.serialize(), ctAfterSload.ciphertext.serialize()) {
@@ -768,7 +769,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
 	interpreter := newTestInterpreter()
-	ct, ctHash := verifyCiphertextInTestState(interpreter, 2, depth)
+	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)
 	value := uint256FromBig(ctHash.Big())
@@ -788,7 +789,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	if metadata.refCount != 1 {
 		t.Fatalf("metadata.refcount of ciphertext is not 1")
 	}
-	if metadata.length != uint64(len(ct.serialize())) {
+	if metadata.length != uint64(fheCiphertextSize) {
 		t.Fatalf("metadata.length of ciphertext is incorrect")
 	}
 	ciphertextLocationsToCheck := (metadata.length + 32 - 1) / 32
@@ -860,65 +861,13 @@ func TestProtectedStorageSloadDoesNotVerifyNonHandle(t *testing.T) {
 	}
 }
 
-func TestProtectedStorageSloadAlreadyVerified(t *testing.T) {
-	pc := uint64(0)
-	depth := 2
-	interpreter := newTestInterpreter()
-	ct, ctHash := verifyCiphertextInTestState(interpreter, 2, depth)
-	scope := newTestScopeConext()
-	loc := uint256.NewInt(10)
-	value := uint256FromBig(ctHash.Big())
-
-	scope.Stack.push(value)
-	scope.Stack.push(loc)
-	_, err := opSstore(&pc, interpreter, scope)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	// SLOAD at a further depth.
-	interpreter.evm.depth = depth + 1
-	scope.Stack.push(loc)
-	_, err = opSload(&pc, interpreter, scope)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	ctAfterSload, found := interpreter.verifiedCiphertexts[ctHash]
-	if !found {
-		t.Fatalf("expected ciphertext is verified after sload")
-	}
-	if !bytes.Equal(ct.serialize(), ctAfterSload.ciphertext.serialize()) {
-		t.Fatalf("expected ciphertext after sload is the same as original")
-	}
-	if ctAfterSload.depth != depth {
-		t.Fatalf("expected already verified ciphertext to have the minimum depth of the two depths")
-	}
-
-	// SLOAD at a smaller depth.
-	interpreter.evm.depth = depth - 1
-	scope.Stack.push(loc)
-	_, err = opSload(&pc, interpreter, scope)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	ctAfterSload, found = interpreter.verifiedCiphertexts[ctHash]
-	if !found {
-		t.Fatalf("expected ciphertext is verified after sload")
-	}
-	if !bytes.Equal(ct.serialize(), ctAfterSload.ciphertext.serialize()) {
-		t.Fatalf("expected ciphertext after sload is the same as original")
-	}
-	if ctAfterSload.depth != depth-1 {
-		t.Fatalf("expected already verified ciphertext to have the depth at sload")
-	}
-}
-
 func TestOpReturnDelegation(t *testing.T) {
 	pc := uint64(0)
 	depth := 2
 	interpreter := newTestInterpreter()
 	scope := newTestScopeConext()
-	ct, ctHash := verifyCiphertextInTestState(interpreter, 2, depth)
+	ct := verifyCiphertextInTestMemory(interpreter, 2, depth)
+	ctHash := ct.getHash()
 
 	offset := uint256.NewInt(0)
 	len := uint256.NewInt(32)
@@ -927,24 +876,28 @@ func TestOpReturnDelegation(t *testing.T) {
 	scope.Memory.Set(offset.Uint64(), len.Uint64(), ctHash[:])
 	interpreter.evm.depth = depth
 	opReturn(&pc, interpreter, scope)
-	ctAfterOp, found := interpreter.verifiedCiphertexts[ctHash]
-	if !found {
+	interpreter.evm.depth--
+	ctAfterOp := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+	if ctAfterOp == nil {
 		t.Fatalf("expected ciphertext is still verified after the return op")
 	}
 	if !bytes.Equal(ct.serialize(), ctAfterOp.ciphertext.serialize()) {
 		t.Fatalf("expected ciphertext after the return op is the same as original")
 	}
-	if ctAfterOp.depth != depth-1 {
-		t.Fatalf("expected ciphertext depth to be reduced by 1 after the return op")
+	if ctAfterOp.verifiedAt.from != depth-1 {
+		t.Fatalf("expected ciphertext `from` to be decremented by 1 after the return op")
+	}
+	if ctAfterOp.verifiedAt.to != depth-1 {
+		t.Fatalf("expected ciphertext `to` to be decremented by 1 after the return op")
 	}
 }
 
-func TestOpReturnRemovesVerificationIfNotReturned(t *testing.T) {
+func TestOpReturnUnverifyIfNotReturned(t *testing.T) {
 	pc := uint64(0)
 	depth := 2
 	interpreter := newTestInterpreter()
 	scope := newTestScopeConext()
-	_, ctHash := verifyCiphertextInTestState(interpreter, 2, depth)
+	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
 
 	offset := uint256.NewInt(0)
 	len := uint256.NewInt(32)
@@ -954,8 +907,221 @@ func TestOpReturnRemovesVerificationIfNotReturned(t *testing.T) {
 	scope.Memory.Set(offset.Uint64(), len.Uint64(), make([]byte, len.Uint64()))
 	interpreter.evm.depth = depth
 	opReturn(&pc, interpreter, scope)
-	_, found := interpreter.verifiedCiphertexts[ctHash]
-	if found {
+	interpreter.evm.depth = depth - 1
+	ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+	if ct != nil {
 		t.Fatalf("expected ciphertext is not verified after the return op")
+	}
+}
+
+func TestOpReturnDoesNotUnverifyIfNotVerified(t *testing.T) {
+	pc := uint64(0)
+	interpreter := newTestInterpreter()
+	scope := newTestScopeConext()
+	ct := verifyCiphertextInTestMemory(interpreter, 2, 4)
+	ctHash := ct.getHash()
+
+	// Return from depth 3 to depth 2. However, ct is not verified at 3 and, hence, cannot
+	// be passed from 3 to 2. However, we expect that ct remains verified at 4.
+	offset := uint256.NewInt(0)
+	len := uint256.NewInt(32)
+	scope.Stack.push(len)
+	scope.Stack.push(offset)
+	scope.Memory.Set(offset.Uint64(), len.Uint64(), ctHash[:])
+	interpreter.evm.depth = 3
+	opReturn(&pc, interpreter, scope)
+	interpreter.evm.depth--
+
+	ctAt2 := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+	if ctAt2 != nil {
+		t.Fatalf("expected ciphertext is not verified at 2")
+	}
+	interpreter.evm.depth = 3
+	ctAt3 := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+	if ctAt3 != nil {
+		t.Fatalf("expected ciphertext is not verified at 3")
+	}
+	interpreter.evm.depth = 4
+	ctAt4 := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+	if ctAt4 == nil {
+		t.Fatalf("expected ciphertext is still verified at 4")
+	}
+	if !bytes.Equal(ct.serialize(), ctAt4.ciphertext.serialize()) {
+		t.Fatalf("expected ciphertext after the return op is the same as original")
+	}
+	if ctAt4.verifiedAt.from != 4 {
+		t.Fatalf("expected ciphertext `from` to be 4")
+	}
+	if ctAt4.verifiedAt.to != 4 {
+		t.Fatalf("expected ciphertext `to` to be 4")
+	}
+}
+
+// Use variables to get addresses of functions.
+var vOpCall = opCall
+var vOpCallCode = opCallCode
+var vOpDelegateCall = opDelegateCall
+var vOpStaticCall = opStaticCall
+
+type OpCodeFun *func(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error)
+
+var callsToTest = []OpCodeFun{
+	&vOpCall,
+	&vOpCallCode,
+	&vOpDelegateCall,
+	&vOpStaticCall,
+}
+
+func setupOpCall(call OpCodeFun, interpreter *EVMInterpreter, callArg common.Hash) (pc uint64, scope *ScopeContext) {
+	pc = uint64(0)
+	scope = newTestScopeConext()
+
+	retSize := uint256.NewInt(32)
+	retOffset := uint256.NewInt(32)
+	inSize := uint256.NewInt(32)
+	inOffset := uint256.NewInt(0)
+	scope.Memory.Set(inOffset.Uint64(), inSize.Uint64(), callArg[:])
+	value := uint256.NewInt(0)
+	addr := uint256.NewInt(0)
+	addr.SetBytes([]byte{74}) // Call fheRand.
+	gas := uint256.NewInt(99999999999)
+	interpreter.evm.callGasTemp = gas.Uint64()
+
+	scope.Stack.push(retSize)
+	scope.Stack.push(retOffset)
+	scope.Stack.push(inSize)
+	scope.Stack.push(inOffset)
+	if call == &vOpCall || call == &vOpCallCode {
+		scope.Stack.push(value)
+	}
+	scope.Stack.push(addr)
+	scope.Stack.push(gas)
+
+	return
+}
+
+func TestOpCallDelegatesIfHandleInArgs(t *testing.T) {
+	for _, call := range callsToTest {
+		depth := 2
+		interpreter := newTestInterpreter()
+		interpreter.evm.depth = depth
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
+		pc, scope := setupOpCall(call, interpreter, ctHash)
+		_, err := (*call)(&pc, interpreter, scope)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		// Increment depth as if we are still in the called contract.
+		// Here, we assume opCall *itself* doesn't change depth. Instead, it is interpreter.Run() that does it.
+		// However, since we pass 0 as address, we won't actually call interpreter.Run().
+		if interpreter.evm.depth != depth {
+			t.Fatalf("expected opcall doesn't change depth")
+		}
+		interpreter.evm.depth++
+
+		// Check if the handle is verified.
+		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct == nil {
+			t.Fatalf("expected ciphertext is verified after opcall")
+		}
+	}
+}
+
+func TestOpCallDoesNotDelegateIfHandleNotInArgs(t *testing.T) {
+	for _, call := range callsToTest {
+		depth := 2
+		interpreter := newTestInterpreter()
+		interpreter.evm.depth = depth
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
+		pc, scope := setupOpCall(call, interpreter, common.Hash{})
+		_, err := (*call)(&pc, interpreter, scope)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		// See rationale in TestOpCallDelegatesIfHandleInArgs() for more information.
+		if interpreter.evm.depth != depth {
+			t.Fatalf("expected opcall doesn't change depth")
+		}
+		interpreter.evm.depth++
+
+		// Check if the handle is verified.
+		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct != nil {
+			t.Fatalf("expected ciphertext is not verified after opcall")
+		}
+	}
+}
+
+func TestOpCallVerifySameCiphertextDeeperInStack(t *testing.T) {
+	for _, call := range callsToTest {
+		interpreter := newTestInterpreter()
+		interpreter.evm.depth = 2
+		ct := verifyCiphertextInTestMemory(interpreter, 2, 2)
+
+		pc, scope := setupOpCall(call, interpreter, common.Hash{})
+		_, err := (*call)(&pc, interpreter, scope)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		// Simulate a verification by the code running at depth 3. It could, for example, be due to an SLOAD.
+		interpreter.evm.depth = 3
+		ct = verifyTfheCiphertextInTestMemory(interpreter, ct, 3)
+
+		// Make sure the ciphertext remains verified at depth 2, even though there is no return opcode
+		// to make it available from depth 3 to depth 2.
+		interpreter.evm.depth = 2
+		verifiedCiphertext := getVerifiedCiphertextFromEVM(interpreter, ct.getHash())
+		if verifiedCiphertext == nil {
+			t.Fatalf("expected that the ciphertext is still verified at depth 2")
+		}
+	}
+}
+
+func TestOpCallDoesNotDelegateIfNotVerified(t *testing.T) {
+	for _, call := range callsToTest {
+		verifiedAtDepth := 2
+		interpreter := newTestInterpreter()
+		interpreter.evm.depth = verifiedAtDepth + 1
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, verifiedAtDepth).getHash()
+		pc, scope := setupOpCall(call, interpreter, ctHash)
+		_, err := (*call)(&pc, interpreter, scope)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		// See rationale in TestOpCallDelegatesIfHandleInArgs() for more information.
+		if interpreter.evm.depth != verifiedAtDepth+1 {
+			t.Fatalf("expected opcall doesn't change depth")
+		}
+		interpreter.evm.depth++
+
+		// Check if the handle is verified verifiedDepth + 2.
+		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct != nil {
+			t.Fatalf("expected ciphertext is not verified after opcall at verifiedAtDepth + 2")
+		}
+
+		// Check if the handle is verified verifiedDepth + 1.
+		interpreter.evm.depth--
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct != nil {
+			t.Fatalf("expected ciphertext is not verified after opcall at verifiedAtDepth + 1")
+		}
+
+		// Check if the handle is verified verifiedDepth.
+		interpreter.evm.depth--
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct == nil {
+			t.Fatalf("expected ciphertext is verified after opcall at verifiedAtDepth")
+		}
+		if ct.verifiedAt.from != verifiedAtDepth {
+			t.Fatalf("expected ciphertext from = verifiedAtDepth")
+		}
+		if ct.verifiedAt.to != verifiedAtDepth {
+			t.Fatalf("expected ciphertext to = verifiedAtDepth")
+		}
 	}
 }
