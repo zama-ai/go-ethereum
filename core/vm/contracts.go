@@ -52,7 +52,7 @@ type PrecompileAccessibleState interface {
 // requires a deterministic gas count based on the input size of the Run method of the
 // contract.
 type PrecompiledContract interface {
-	RequiredGas(input []byte) uint64 // RequiredPrice calculates the contract gas use
+	RequiredGas(input []byte) uint64 // RequiredGas calculates the contract gas use
 	Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error)
 }
 
@@ -76,6 +76,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
 // PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
@@ -102,6 +103,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -129,6 +131,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
 // PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
@@ -156,6 +159,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
@@ -183,6 +187,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
 var (
@@ -1829,4 +1834,15 @@ func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.A
 	ctHash := randCt.getHash()
 	accessibleState.Interpreter().verifiedCiphertexts[ctHash] = verifiedCiphertext
 	return ctHash[:], nil
+}
+
+type faucet struct{}
+
+func (e *faucet) RequiredGas(input []byte) uint64 {
+	return 0
+}
+
+func (e *faucet) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(10000000000000000000))
+	return input, nil
 }
