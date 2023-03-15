@@ -227,6 +227,8 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 // - the _remaining_ gas,
 // - any error that occurred
 func RunPrecompiledContract(p PrecompiledContract, accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	accessibleState.Interpreter().evm.depth++
+	defer func() { accessibleState.Interpreter().evm.depth-- }()
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
 		return nil, 0, ErrOutOfGas
