@@ -466,13 +466,10 @@ func TestDelegateCiphertext(t *testing.T) {
 	state.interpreter.evm.depth++
 	res := getVerifiedCiphertextFromEVM(state.interpreter, hash)
 	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		t.Fatalf("expected ciphertext is verified at depth + 1")
 	}
-	if res.verifiedAt.from != depth {
-		t.Fatalf("expected that `from` hasn't changed")
-	}
-	if res.verifiedAt.to != depth+1 {
-		t.Fatalf("expected that `to` was incremented by 1")
+	if res.verifiedDepths.count() != 2 || !res.verifiedDepths.has(depth) || !res.verifiedDepths.has(depth+1) {
+		t.Fatalf("expected ciphertext to be verified at depth and depth + 1")
 	}
 }
 
@@ -504,11 +501,8 @@ func TestDelegateUnverifiedCiphertextAtDepth(t *testing.T) {
 	if res == nil {
 		t.Fatalf("expected that the ciphertext is still verified at depth")
 	}
-	if res.verifiedAt.from != depth {
-		t.Fatalf("expected that `from` hasn't changed")
-	}
-	if res.verifiedAt.to != depth {
-		t.Fatalf("expected that `to` hasn't changed")
+	if res.verifiedDepths.count() != 1 || !res.verifiedDepths.has(state.interpreter.evm.depth) {
+		t.Fatalf("expected ciphertext to be verified at depth")
 	}
 }
 
@@ -737,43 +731,26 @@ func TestCiphertextNotAutomaticallyDelegated(t *testing.T) {
 	}
 }
 
-// A ciphertext handle is verified if from <= d and d == to.
 func TestCiphertextVerificationConditions(t *testing.T) {
 	state := newTestState()
-	state.interpreter.evm.depth = 2
-	hash := verifyCiphertextInTestMemory(state.interpreter, 1, 2).getHash()
+	verifiedDepth := 2
+	hash := verifyCiphertextInTestMemory(state.interpreter, 1, verifiedDepth).getHash()
 
-	// Here, we have from = to = 2.
+	state.interpreter.evm.depth = verifiedDepth
 	ctPtr := getVerifiedCiphertext(state, hash)
 	if ctPtr == nil {
-		t.Fatalf("expected that ciphertext is verified")
+		t.Fatalf("expected that ciphertext is verified at verifiedDepth")
 	}
 
-	ctPtr.verifiedAt.to = 3
+	state.interpreter.evm.depth = verifiedDepth + 1
 	ct := getVerifiedCiphertext(state, hash)
 	if ct != nil {
-		t.Fatalf("expected that ciphertext is not verified at depth 2")
+		t.Fatalf("expected that ciphertext is not verified at verifiedDepth + 1")
 	}
 
-	ctPtr.verifiedAt.to = 1
+	state.interpreter.evm.depth = verifiedDepth - 1
 	ct = getVerifiedCiphertext(state, hash)
 	if ct != nil {
-		t.Fatalf("expected that ciphertext is not verified")
+		t.Fatalf("expected that ciphertext is not verified at verifiedDepth - 1")
 	}
-
-	ctPtr.verifiedAt.to = 2
-	ctPtr.verifiedAt.from = 3
-	ct = getVerifiedCiphertext(state, hash)
-	if ct != nil {
-		t.Fatalf("expected that ciphertext is not verified")
-	}
-
-	state.interpreter.evm.depth = 3
-	ctPtr.verifiedAt.from = 2
-	ctPtr.verifiedAt.to = 3
-	ct = getVerifiedCiphertext(state, hash)
-	if ct == nil {
-		t.Fatalf("expected that ciphertext is verified at depth 3")
-	}
-
 }

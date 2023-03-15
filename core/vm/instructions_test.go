@@ -870,10 +870,10 @@ func TestOpReturnDelegation(t *testing.T) {
 	ctHash := ct.getHash()
 
 	offset := uint256.NewInt(0)
-	len := uint256.NewInt(32)
-	scope.Stack.push(len)
+	length := uint256.NewInt(32)
+	scope.Stack.push(length)
 	scope.Stack.push(offset)
-	scope.Memory.Set(offset.Uint64(), len.Uint64(), ctHash[:])
+	scope.Memory.Set(offset.Uint64(), length.Uint64(), ctHash[:])
 	interpreter.evm.depth = depth
 	opReturn(&pc, interpreter, scope)
 	interpreter.evm.depth--
@@ -884,11 +884,8 @@ func TestOpReturnDelegation(t *testing.T) {
 	if !bytes.Equal(ct.serialize(), ctAfterOp.ciphertext.serialize()) {
 		t.Fatalf("expected ciphertext after the return op is the same as original")
 	}
-	if ctAfterOp.verifiedAt.from != depth-1 {
-		t.Fatalf("expected ciphertext `from` to be decremented by 1 after the return op")
-	}
-	if ctAfterOp.verifiedAt.to != depth-1 {
-		t.Fatalf("expected ciphertext `to` to be decremented by 1 after the return op")
+	if ctAfterOp.verifiedDepths.count() != 1 || !ctAfterOp.verifiedDepths.has(interpreter.evm.depth) {
+		t.Fatalf("expected ciphertext to be verified only at depth - 1 after the return op")
 	}
 }
 
@@ -949,11 +946,8 @@ func TestOpReturnDoesNotUnverifyIfNotVerified(t *testing.T) {
 	if !bytes.Equal(ct.serialize(), ctAt4.ciphertext.serialize()) {
 		t.Fatalf("expected ciphertext after the return op is the same as original")
 	}
-	if ctAt4.verifiedAt.from != 4 {
-		t.Fatalf("expected ciphertext `from` to be 4")
-	}
-	if ctAt4.verifiedAt.to != 4 {
-		t.Fatalf("expected ciphertext `to` to be 4")
+	if ctAt4.verifiedDepths.count() != 1 || !ctAt4.verifiedDepths.has(interpreter.evm.depth) {
+		t.Fatalf("expected ciphertext to be verified at depth 4")
 	}
 }
 
@@ -1117,11 +1111,8 @@ func TestOpCallDoesNotDelegateIfNotVerified(t *testing.T) {
 		if ct == nil {
 			t.Fatalf("expected ciphertext is verified after opcall at verifiedAtDepth")
 		}
-		if ct.verifiedAt.from != verifiedAtDepth {
-			t.Fatalf("expected ciphertext from = verifiedAtDepth")
-		}
-		if ct.verifiedAt.to != verifiedAtDepth {
-			t.Fatalf("expected ciphertext to = verifiedAtDepth")
+		if ct.verifiedDepths.count() != 1 || !ct.verifiedDepths.has(interpreter.evm.depth) {
+			t.Fatalf("expected ciphertext to be verified at verifiedAtDepth")
 		}
 	}
 }

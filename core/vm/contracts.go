@@ -1217,43 +1217,36 @@ func init() {
 	}
 }
 
-func isVerifiedAtCurrentDepth(interpreter *EVMInterpreter, ct *verifiedCiphertext) *depthRange {
-	currentDepth := interpreter.evm.depth
-	for _, r := range ct.depthRanges {
-		if r.from <= currentDepth && currentDepth == r.to {
-			return r
-		}
-	}
-	return nil
+func isVerifiedAtCurrentDepth(interpreter *EVMInterpreter, ct *verifiedCiphertext) bool {
+	return ct.verifiedDepths.has(interpreter.evm.depth)
 }
 
 // Returns a pointer to the ciphertext if the given hash points to a verified ciphertext.
 // Else, it returns nil.
-func getVerifiedCiphertextFromEVM(interpreter *EVMInterpreter, ciphertextHash common.Hash) *verifiedCiphertextAtDepth {
+func getVerifiedCiphertextFromEVM(interpreter *EVMInterpreter, ciphertextHash common.Hash) *verifiedCiphertext {
 	ct, ok := interpreter.verifiedCiphertexts[ciphertextHash]
-	if ok {
-		dr := isVerifiedAtCurrentDepth(interpreter, ct)
-		if dr != nil {
-			return &verifiedCiphertextAtDepth{dr, ct.ciphertext}
-		}
+	if ok && isVerifiedAtCurrentDepth(interpreter, ct) {
+		return ct
 	}
 	return nil
 }
 
 // See getVerifiedCiphertextFromEVM().
-func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) *verifiedCiphertextAtDepth {
+func getVerifiedCiphertext(accessibleState PrecompileAccessibleState, ciphertextHash common.Hash) *verifiedCiphertext {
 	return getVerifiedCiphertextFromEVM(accessibleState.Interpreter(), ciphertextHash)
 }
 
 func importCiphertextToEVMAtDepth(interpreter *EVMInterpreter, ct *tfheCiphertext, depth int) *verifiedCiphertext {
 	existing, ok := interpreter.verifiedCiphertexts[ct.getHash()]
 	if ok {
-		existing.depthRanges = append(existing.depthRanges, &depthRange{depth, depth})
+		existing.verifiedDepths.add(depth)
 		return existing
 	} else {
+		verifiedDepths := newDepthSet()
+		verifiedDepths.add(depth)
 		new := &verifiedCiphertext{
-			depthRanges: []*depthRange{{depth, depth}},
-			ciphertext:  ct,
+			verifiedDepths,
+			ct,
 		}
 		interpreter.verifiedCiphertexts[ct.getHash()] = new
 		return new
@@ -1449,7 +1442,7 @@ func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, call
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct != nil {
-		ct.verifiedAt.to++
+		ct.verifiedDepths.add(accessibleState.Interpreter().evm.depth + 1)
 		return nil, nil
 	}
 	return nil, errors.New("unverified ciphertext handle")

@@ -827,11 +827,8 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 // If there are ciphertext handles in the arguments to a call, delegate them to the callee.
 func delegateCiphertextHandlesInArgs(interpreter *EVMInterpreter, args []byte) {
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
-		if contains(args, key.Bytes()) {
-			dr := isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext)
-			if dr != nil {
-				dr.to++
-			}
+		if contains(args, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
+			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth + 1)
 		}
 	}
 }
@@ -985,27 +982,12 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	ret := scope.Memory.GetPtr(int64(offset.Uint64()), int64(size.Uint64()))
 
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
-		if contains(ret, key.Bytes()) {
+		if contains(ret, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
 			// If a handle is returned, automatically make it available to the caller.
-			dr := isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext)
-			if dr != nil {
-				dr.from = minInt(dr.from, interpreter.evm.depth-1)
-				dr.to--
-			}
-		} else {
-			// Loop over ranges and only keep ones that have from <= d -1 . Other ones are
-			// removed and are no longer verified in the caller.
-			temp := verifiedCiphertext.depthRanges[:0]
-			for _, dr := range verifiedCiphertext.depthRanges {
-				if dr.from <= interpreter.evm.depth-1 {
-					temp = append(temp, dr)
-				}
-			}
-			verifiedCiphertext.depthRanges = temp
-			if len(verifiedCiphertext.depthRanges) == 0 {
-				delete(interpreter.verifiedCiphertexts, key)
-			}
+			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth - 1)
 		}
+		// Delete the current EVM depth. Do that after the `isVerifiedAtCurrentDepth()` check.
+		verifiedCiphertext.verifiedDepths.del(interpreter.evm.depth)
 	}
 
 	return ret, errStopToken
