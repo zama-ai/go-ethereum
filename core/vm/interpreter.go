@@ -52,9 +52,36 @@ type keccakState interface {
 	Read([]byte) (int, error)
 }
 
+type depthSet struct {
+	m map[int]struct{}
+}
+
+func newDepthSet() *depthSet {
+	s := &depthSet{}
+	s.m = make(map[int]struct{})
+	return s
+}
+
+func (s *depthSet) add(v int) {
+	s.m[v] = struct{}{}
+}
+
+func (s *depthSet) del(v int) {
+	delete(s.m, v)
+}
+
+func (s *depthSet) has(v int) bool {
+	_, found := s.m[v]
+	return found
+}
+
+func (s *depthSet) count() int {
+	return len(s.m)
+}
+
 type verifiedCiphertext struct {
-	depth      int
-	ciphertext *tfheCiphertext
+	verifiedDepths *depthSet
+	ciphertext     *tfheCiphertext
 }
 
 // EVMInterpreter represents an EVM interpreter
