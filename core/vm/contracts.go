@@ -76,6 +76,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -103,6 +104,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -131,6 +133,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -159,6 +162,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -187,6 +191,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1845,6 +1850,20 @@ func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.A
 	}
 	ctHash := randCt.getHash()
 	return ctHash[:], nil
+}
+
+type cast struct{}
+
+func (e *cast) RequiredGas(input []byte) uint64 {
+	return 0
+}
+
+// Implementation of the following will depend on the work done by the TFHE-rs team
+// i.e., to they have a `cast` method implemented?
+func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	// var ctHandle = common.BytesToHash(input[0:31])
+	// var toType = input[32]
+	return nil, nil
 }
 
 type faucet struct{}
