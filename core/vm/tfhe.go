@@ -169,6 +169,7 @@ import (
 	"errors"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -225,14 +226,15 @@ func init() {
 	if err != nil {
 		return
 	}
-
-	cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
-	if err != nil {
-		return
-	}
-
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
-	cks = C.deserialize_client_key(toBufferView(cks_bytes))
+
+	if strings.ToLower(tomlConfig.Oracle.Mode) == "oracle" {
+		cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
+		if err != nil {
+			return
+		}
+		cks = C.deserialize_client_key(toBufferView(cks_bytes))
+	}
 
 	// Use trivial encryption to determine the ciphertext size for the used parameters.
 	// Note: parameters are embedded in the client `cks` key.
