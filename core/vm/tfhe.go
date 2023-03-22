@@ -153,10 +153,10 @@ void* trivial_encrypt(void* sks, uint64_t value) {
 	return ct;
 }
 
-size_t get_message_modulus(void* cks) {
+size_t get_message_modulus(void* sks) {
 	size_t modulus = 0;
 
-	const int r = shortint_client_key_get_message_modulus(cks, &modulus);
+	const int r = shortint_server_key_get_message_modulus(sks, &modulus);
 	assert(r == 0);
 
 	return modulus;
@@ -242,7 +242,7 @@ func init() {
 	ct.trivialEncrypt(1)
 	fheCiphertextSize = len(ct.serialize())
 
-	fheMessageModulus = uint64(C.get_message_modulus(cks))
+	fheMessageModulus = uint64(C.get_message_modulus(sks))
 
 	go runGc()
 }
