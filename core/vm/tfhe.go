@@ -224,14 +224,14 @@ func init() {
 
 	sks_bytes, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
-		return
+		panic(err)
 	}
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
 
 	if strings.ToLower(tomlConfig.Oracle.Mode) == "oracle" {
 		cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
 		if err != nil {
-			return
+			panic(err)
 		}
 		cks = C.deserialize_client_key(toBufferView(cks_bytes))
 	}
