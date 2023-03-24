@@ -153,10 +153,10 @@ void* trivial_encrypt(void* sks, uint64_t value) {
 	return ct;
 }
 
-size_t get_message_modulus(void* cks) {
+size_t get_message_modulus(void* sks) {
 	size_t modulus = 0;
 
-	const int r = shortint_client_key_get_message_modulus(cks, &modulus);
+	const int r = shortint_server_key_get_message_modulus(sks, &modulus);
 	assert(r == 0);
 
 	return modulus;
@@ -167,8 +167,10 @@ import "C"
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -223,16 +225,19 @@ func init() {
 
 	sks_bytes, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
+		fmt.Print("WARNING: file sks not found.\n")
 		return
 	}
-
-	cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
-	if err != nil {
-		return
-	}
-
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
-	cks = C.deserialize_client_key(toBufferView(cks_bytes))
+
+	if strings.ToLower(tomlConfig.Oracle.Mode) == "oracle" {
+		cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
+		if err != nil {
+			fmt.Print("WARNING: file cks not found.\n")
+			return
+		}
+		cks = C.deserialize_client_key(toBufferView(cks_bytes))
+	}
 
 	// Use trivial encryption to determine the ciphertext size for the used parameters.
 	// Note: parameters are embedded in the client `cks` key.
@@ -240,7 +245,7 @@ func init() {
 	ct.trivialEncrypt(1)
 	fheCiphertextSize = len(ct.serialize())
 
-	fheMessageModulus = uint64(C.get_message_modulus(cks))
+	fheMessageModulus = uint64(C.get_message_modulus(sks))
 
 	go runGc()
 }
