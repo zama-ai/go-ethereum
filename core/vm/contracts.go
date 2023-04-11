@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"os"
@@ -1355,14 +1355,12 @@ func verifyZkProof(input []byte) []byte {
 		if err != nil {
 			continue
 		}
-		// The ZKPoK service returns 406 if the proof is incorrect.
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
 		if resp.StatusCode == 406 {
+			// The ZKPoK service returns 406 if the proof is incorrect.
 			return nil
-		} else if resp.StatusCode != 200 {
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
+		} else if resp.StatusCode != 200 || err != nil {
 			continue
 		}
 		return body
@@ -1493,6 +1491,8 @@ func putRequire(ct *tfheCiphertext) bool {
 		if err != nil {
 			continue
 		}
+		defer resp.Body.Close()
+		io.ReadAll(resp.Body)
 		if resp.StatusCode != 200 {
 			continue
 		}
@@ -1516,11 +1516,9 @@ func getRequire(ct *tfheCiphertext) bool {
 		if err != nil {
 			continue
 		}
-		if resp.StatusCode != 200 {
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if resp.StatusCode != 200 || err != nil {
 			continue
 		}
 		msg := requireMessage{}
