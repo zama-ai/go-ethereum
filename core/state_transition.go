@@ -126,6 +126,8 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 	}
 	// Bump the required gas by the amount of transactional data
 	if len(data) > 0 {
+		// We ignore EIP 20228 here. Rationale is that current gas cost calculation is very different.
+		// Please consult EIP 2028 for more information, especially if the current gas calculation is problematic.
 		gas += uint64(len(data)) / params.TxFheDataFractionalGas
 	}
 	if accessList != nil {
