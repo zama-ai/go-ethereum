@@ -559,6 +559,13 @@ func newInt(buf []byte) *uint256.Int {
 var zero = uint256.NewInt(0).Bytes32()
 
 func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, contractAddress common.Address) {
+	ct, ok := interpreter.verifiedCiphertexts[val]
+	if ok {
+		// If already existing in memory, skip storage and import the same ciphertext at the current depth.
+		importCiphertextToEVM(interpreter, ct.ciphertext)
+		return
+	}
+
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
 	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !metadataInt.IsZero() {
@@ -577,16 +584,11 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 			ctBytes = append(ctBytes, bytes[0:toAppend]...)
 			protectedSlotIdx.AddUint64(protectedSlotIdx, 1)
 		}
-		var ct *tfheCiphertext
-		verifiedCt := getVerifiedCiphertextFromEVM(interpreter, val)
-		if verifiedCt != nil {
-			ct = verifiedCt.ciphertext
-		} else {
-			ct = new(tfheCiphertext)
-			err := ct.deserialize(ctBytes, metadata.fheUintType)
-			if err != nil {
-				exitProcess()
-			}
+
+		ct := new(tfheCiphertext)
+		err := ct.deserialize(ctBytes, metadata.fheUintType)
+		if err != nil {
+			exitProcess()
 		}
 		importCiphertextToEVM(interpreter, ct)
 	}
