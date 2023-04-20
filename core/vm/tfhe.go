@@ -366,8 +366,10 @@ import "C"
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -419,12 +421,18 @@ func init() {
 
 	sks_bytes, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
+		fmt.Print("WARNING: file sks not found.\n")
 		return
 	}
+	sks = C.deserialize_server_key(toBufferView(sks_bytes))
 
-	cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
-	if err != nil {
-		return
+	if strings.ToLower(tomlConfig.Oracle.Mode) == "oracle" {
+		cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
+		if err != nil {
+			fmt.Print("WARNING: file cks not found.\n")
+			return
+		}
+		cks = C.deserialize_client_key(toBufferView(cks_bytes))
 	}
 
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
