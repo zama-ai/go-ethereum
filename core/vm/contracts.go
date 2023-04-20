@@ -1832,8 +1832,7 @@ func (e *cast) RequiredGas(input []byte) uint64 {
 	return 0
 }
 
-// Implementation of the following will depend on the work done by the TFHE-rs team
-// i.e., to they have a `cast` method implemented?
+// Implementation of the following is pending and will be completed once TFHE-rs add type casts to their high-level C API.
 func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	// var ctHandle = common.BytesToHash(input[0:31])
 	// var toType = input[32]
