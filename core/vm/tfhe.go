@@ -369,7 +369,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -426,13 +425,10 @@ func init() {
 	}
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))
 
-	if strings.ToLower(tomlConfig.Oracle.Mode) == "oracle" {
-		cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
-		if err != nil {
-			fmt.Print("WARNING: file cks not found.\n")
-			return
-		}
-		cks = C.deserialize_client_key(toBufferView(cks_bytes))
+	cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
+	if err != nil {
+		fmt.Print("WARNING: file cks not found.\n")
+		return
 	}
 
 	sks = C.deserialize_server_key(toBufferView(sks_bytes))

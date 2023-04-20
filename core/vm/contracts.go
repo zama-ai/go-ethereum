@@ -1344,16 +1344,21 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	if len(input) <= 1 {
+		return nil, errors.New("input needs to contain one 256-bit sized values and one 8-bit sized value")
+	}
+
+	ctBytes := input[:len(input)-1]
+	ctType := fheUintType(input[len(input)-1])
+
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState, fheUintType(input[len(input)-1])), nil
+		return importRandomCiphertext(accessibleState, ctType), nil
 	}
 
 	ct := new(tfheCiphertext)
-	ct_bytes := input[:len(input)-1]
-	ct_type := fheUintType(input[len(input)-1])
-	err := ct.deserialize(ct_bytes, ct_type)
-	ct.fheUintType = fheUintType(input[len(input)-1])
+	err := ct.deserialize(ctBytes, ctType)
+	ct.fheUintType = ctType
 
 	if err != nil {
 		return nil, err

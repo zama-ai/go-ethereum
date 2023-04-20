@@ -533,6 +533,7 @@ func (m ciphertextMetadata) serialize() [32]byte {
 	u := uint256.NewInt(0)
 	u[0] = m.refCount
 	u[1] = m.length
+	u[2] = uint64(m.fheUintType)
 	return u.Bytes32()
 }
 
@@ -541,6 +542,7 @@ func (m *ciphertextMetadata) deserialize(buf [32]byte) *ciphertextMetadata {
 	u.SetBytes(buf[:])
 	m.refCount = u[0]
 	m.length = u[1]
+	m.fheUintType = fheUintType(u[2])
 	return m
 }
 
