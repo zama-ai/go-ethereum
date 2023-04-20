@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"os"
@@ -67,7 +67,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	// slot 68 is available for use
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -95,7 +95,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	// slot 68 is available for use
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -124,7 +124,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	// slot 68 is available for use
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -153,7 +153,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	// slot 68 is available for use
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -182,7 +182,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	common.BytesToAddress([]byte{68}): &delegateCiphertext{},
+	// slot 68 is available for use
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -1401,25 +1401,6 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	return nil, errors.New("unverified ciphertext handle")
 }
 
-type delegateCiphertext struct{}
-
-func (e *delegateCiphertext) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
-}
-
-func (e *delegateCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if len(input) != 32 {
-		return nil, errors.New("invalid ciphertext handle")
-	}
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
-	if ct != nil {
-		ct.verifiedDepths.add(accessibleState.Interpreter().evm.depth + 1)
-		return nil, nil
-	}
-	return nil, errors.New("unverified ciphertext handle")
-}
-
 type require struct{}
 
 func (e *require) RequiredGas(input []byte) uint64 {
@@ -1460,6 +1441,8 @@ func putRequire(ct *tfheCiphertext) bool {
 		if err != nil {
 			continue
 		}
+		defer resp.Body.Close()
+		io.ReadAll(resp.Body)
 		if resp.StatusCode != 200 {
 			continue
 		}
@@ -1483,11 +1466,9 @@ func getRequire(ct *tfheCiphertext) bool {
 		if err != nil {
 			continue
 		}
-		if resp.StatusCode != 200 {
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if resp.StatusCode != 200 || err != nil {
 			continue
 		}
 		msg := requireMessage{}
