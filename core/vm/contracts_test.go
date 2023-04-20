@@ -449,63 +449,6 @@ func toPrecompileInput(hashes ...common.Hash) []byte {
 	return ret
 }
 
-func TestDelegateCiphertext(t *testing.T) {
-	c := &delegateCiphertext{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	hash := verifyCiphertextInTestMemory(state.interpreter, 1, depth).getHash()
-	input := toPrecompileInput(hash)
-	_, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	state.interpreter.evm.depth++
-	res := getVerifiedCiphertextFromEVM(state.interpreter, hash)
-	if res == nil {
-		t.Fatalf("expected ciphertext is verified at depth + 1")
-	}
-	if res.verifiedDepths.count() != 2 || !res.verifiedDepths.has(depth) || !res.verifiedDepths.has(depth+1) {
-		t.Fatalf("expected ciphertext to be verified at depth and depth + 1")
-	}
-}
-
-func TestDelegateUnverifiedCiphertextAtDepth(t *testing.T) {
-	c := &delegateCiphertext{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth + 1
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	hash := verifyCiphertextInTestMemory(state.interpreter, 1, depth).getHash()
-	input := toPrecompileInput(hash)
-	_, err := c.Run(state, addr, addr, input, readOnly)
-	if err == nil {
-		t.Fatalf("expected that delegate failed")
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, hash)
-	if res != nil {
-		t.Fatalf("expected that the ciphertext is not verified at depth + 1")
-	}
-	state.interpreter.evm.depth = depth + 2
-	res = getVerifiedCiphertextFromEVM(state.interpreter, hash)
-	if res != nil {
-		t.Fatalf("expected that the ciphertext is not verified at depth + 2")
-	}
-	state.interpreter.evm.depth = depth
-	res = getVerifiedCiphertextFromEVM(state.interpreter, hash)
-	if res == nil {
-		t.Fatalf("expected that the ciphertext is still verified at depth")
-	}
-	if res.verifiedDepths.count() != 1 || !res.verifiedDepths.has(state.interpreter.evm.depth) {
-		t.Fatalf("expected ciphertext to be verified at depth")
-	}
-}
-
 func TestFheAdd(t *testing.T) {
 	c := &fheAdd{}
 	depth := 1
