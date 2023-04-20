@@ -40,7 +40,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/naoina/toml"
-	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -74,7 +73,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
-	common.BytesToAddress([]byte{74}): &fheRand{},
+	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
@@ -102,7 +101,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
-	common.BytesToAddress([]byte{74}): &fheRand{},
+	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
@@ -131,7 +130,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
-	common.BytesToAddress([]byte{74}): &fheRand{},
+	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
@@ -160,7 +159,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
-	common.BytesToAddress([]byte{74}): &fheRand{},
+	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
@@ -189,7 +188,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
-	common.BytesToAddress([]byte{74}): &fheRand{},
+	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{99}): &faucet{},
@@ -1143,12 +1142,6 @@ type tomlConfigOptions struct {
 		RequireRetryCount uint8
 	}
 
-	Zk struct {
-		Verify           bool
-		VerifyRPCAddress string
-		VerifyRetryCount uint8
-	}
-
 	Tfhe struct {
 		CiphertextsToGarbageCollect           uint64
 		CiphertextsGarbageCollectIntervalSecs uint64
@@ -1174,7 +1167,6 @@ func generateEd25519Keys() error {
 }
 
 var requireHttpClient http.Client = http.Client{}
-var zkHttpClient http.Client = http.Client{}
 
 var publicSignatureKey []byte
 var privateSignatureKey []byte
@@ -1272,9 +1264,9 @@ func importCiphertext(accessibleState PrecompileAccessibleState, ct *tfheCiphert
 }
 
 // Used when we want to skip FHE computation, e.g. gas estimation.
-func importRandomCiphertext(accessibleState PrecompileAccessibleState) []byte {
+func importRandomCiphertext(accessibleState PrecompileAccessibleState, t fheUintType) []byte {
 	ct := new(tfheCiphertext)
-	ct.makeRandom()
+	ct.makeRandom(t)
 	importCiphertext(accessibleState, ct)
 	ctHash := ct.getHash()
 	return ctHash[:]
@@ -1303,7 +1295,11 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return nil, errors.New("only same type ops are supported for now")
 	}
 
 	result := lhs.ciphertext.add(rhs.ciphertext)
@@ -1319,13 +1315,13 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func fheEncryptToUserKey(value uint64, userAddress common.Address) ([]byte, error) {
+func fheEncryptToUserKey(value uint64, userAddress common.Address, t fheUintType) ([]byte, error) {
 	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
 	pks, err := os.ReadFile(userPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	ct := publicKeyEncrypt(pks, value)
+	ct := publicKeyEncrypt(pks, value, t)
 
 	// TODO: for testing
 	err = os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
@@ -1347,52 +1343,18 @@ func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
 	return 8
 }
 
-// Returns the verified ciphertext on success or nil on invalid ZK proof.
-// Exits the process on errors.
-func verifyZkProof(input []byte) []byte {
-	for try := uint8(1); try <= tomlConfig.Zk.VerifyRetryCount+1; try++ {
-		req, err := http.NewRequest(http.MethodPost, tomlConfig.Zk.VerifyRPCAddress, bytes.NewReader(input))
-		if err != nil {
-			continue
-		}
-		req.Header.Add("Content-Type", "application/msgpack")
-		resp, err := zkHttpClient.Do(req)
-		if err != nil {
-			continue
-		}
-		// The ZKPoK service returns 406 if the proof is incorrect.
-		if resp.StatusCode == 406 {
-			return nil
-		} else if resp.StatusCode != 200 {
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			continue
-		}
-		return body
-	}
-	exitProcess()
-	return nil
-}
-
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
+		return importRandomCiphertext(accessibleState, fheUintType(input[len(input)-1])), nil
 	}
-	var ctBytes []byte
-	if !tomlConfig.Zk.Verify {
-		// For testing: if input size <= `fheCiphertextSize`, treat the whole input as ciphertext.
-		ctBytes = input[0:minInt(fheCiphertextSize, len(input))]
-	} else {
-		ctBytes = verifyZkProof(input)
-		if ctBytes == nil {
-			return nil, fmt.Errorf("invalid ZK Proof")
-		}
-	}
+
 	ct := new(tfheCiphertext)
-	err := ct.deserialize(ctBytes)
+	ct_bytes := input[:len(input)-1]
+	ct_type := fheUintType(input[len(input)-1])
+	err := ct.deserialize(ct_bytes, ct_type)
+	ct.fheUintType = fheUintType(input[len(input)-1])
+
 	if err != nil {
 		return nil, err
 	}
@@ -1430,7 +1392,7 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct != nil {
 		decryptedValue := ct.ciphertext.decrypt()
-		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin)
+		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin, ct.ciphertext.fheUintType)
 		if err != nil {
 			return nil, err
 		}
@@ -1635,9 +1597,13 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return nil, errors.New("only same type ops are supported for now")
+	}
+
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
 	result := lhs.ciphertext.lte(rhs.ciphertext)
@@ -1675,9 +1641,13 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return nil, errors.New("only same type ops are supported for now")
+	}
+
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
 	result := lhs.ciphertext.sub(rhs.ciphertext)
@@ -1715,9 +1685,13 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return nil, errors.New("only same type ops are supported for now")
+	}
+
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
 	result := lhs.ciphertext.mul(rhs.ciphertext)
@@ -1757,7 +1731,7 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
 	result := lhs.ciphertext.lt(rhs.ciphertext)
@@ -1774,83 +1748,83 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 	return ctHash[:], nil
 }
 
-type fheRand struct{}
+// type fheRand struct{}
 
-var globalRngSeed []byte
+// var globalRngSeed []byte
 
-var rngNonceKey [32]byte = uint256.NewInt(0).Bytes32()
+// var rngNonceKey [32]byte = uint256.NewInt(0).Bytes32()
 
-func init() {
-	if chacha20.NonceSizeX != 24 {
-		panic("expected 24 bytes for NonceSizeX")
-	}
+// func init() {
+// 	if chacha20.NonceSizeX != 24 {
+// 		panic("expected 24 bytes for NonceSizeX")
+// 	}
 
-	// TODO: Since the current implementation is not FHE-based and, hence, not private,
-	// we just initialize the global seed with non-random public data. We will change
-	// that once the FHE version is available.
-	globalRngSeed = make([]byte, chacha20.KeySize)
-	for i := range globalRngSeed {
-		globalRngSeed[i] = byte(1 + i)
-	}
-}
+// 	// TODO: Since the current implementation is not FHE-based and, hence, not private,
+// 	// we just initialize the global seed with non-random public data. We will change
+// 	// that once the FHE version is available.
+// 	globalRngSeed = make([]byte, chacha20.KeySize)
+// 	for i := range globalRngSeed {
+// 		globalRngSeed[i] = byte(1 + i)
+// 	}
+// }
 
-func (e *fheRand) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
-}
+// func (e *fheRand) RequiredGas(input []byte) uint64 {
+// 	// TODO
+// 	return 8
+// }
 
-func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState), nil
-	}
+// func (e *fheRand) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+// 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+// 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+// 		return importRandomCiphertext(accessibleState), nil
+// 	}
 
-	// Get the RNG nonce.
-	protectedStorage := crypto.CreateProtectedStorageContractAddress(caller)
-	currentRngNonceBytes := accessibleState.Interpreter().evm.StateDB.GetState(protectedStorage, rngNonceKey).Bytes()
+// 	// Get the RNG nonce.
+// 	protectedStorage := crypto.CreateProtectedStorageContractAddress(caller)
+// 	currentRngNonceBytes := accessibleState.Interpreter().evm.StateDB.GetState(protectedStorage, rngNonceKey).Bytes()
 
-	// Increment the RNG nonce by 1.
-	nextRngNonce := newInt(currentRngNonceBytes)
-	nextRngNonce = nextRngNonce.AddUint64(nextRngNonce, 1)
-	accessibleState.Interpreter().evm.StateDB.SetState(protectedStorage, rngNonceKey, nextRngNonce.Bytes32())
+// 	// Increment the RNG nonce by 1.
+// 	nextRngNonce := newInt(currentRngNonceBytes)
+// 	nextRngNonce = nextRngNonce.AddUint64(nextRngNonce, 1)
+// 	accessibleState.Interpreter().evm.StateDB.SetState(protectedStorage, rngNonceKey, nextRngNonce.Bytes32())
 
-	// Compute the seed and use it to create a new cipher.
-	hasher := crypto.NewKeccakState()
-	hasher.Write(globalRngSeed)
-	hasher.Write(caller.Bytes())
-	hasher.Write(currentRngNonceBytes)
-	seed := common.Hash{}
-	_, err := hasher.Read(seed[:])
-	if err != nil {
-		return nil, err
-	}
-	// The RNG nonce bytes are of size chacha20.NonceSizeX, which is assumed to be 24 bytes (see init() above).
-	// Since uint256.Int.z[0] is the least significant byte and since uint256.Int.Bytes32() serializes
-	// in order of z[3], z[2], z[1], z[0], we want to essentially ignore the first byte, i.e. z[3], because
-	// it will always be 0 as the nonce size is 24.
-	cipher, err := chacha20.NewUnauthenticatedCipher(seed.Bytes(), currentRngNonceBytes[32-chacha20.NonceSizeX:32])
-	if err != nil {
-		return nil, err
-	}
+// 	// Compute the seed and use it to create a new cipher.
+// 	hasher := crypto.NewKeccakState()
+// 	hasher.Write(globalRngSeed)
+// 	hasher.Write(caller.Bytes())
+// 	hasher.Write(currentRngNonceBytes)
+// 	seed := common.Hash{}
+// 	_, err := hasher.Read(seed[:])
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	// The RNG nonce bytes are of size chacha20.NonceSizeX, which is assumed to be 24 bytes (see init() above).
+// 	// Since uint256.Int.z[0] is the least significant byte and since uint256.Int.Bytes32() serializes
+// 	// in order of z[3], z[2], z[1], z[0], we want to essentially ignore the first byte, i.e. z[3], because
+// 	// it will always be 0 as the nonce size is 24.
+// 	cipher, err := chacha20.NewUnauthenticatedCipher(seed.Bytes(), currentRngNonceBytes[32-chacha20.NonceSizeX:32])
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	// XOR a byte array of 0s with the stream from the cipher and receive the result in the same array.
-	randBytes := make([]byte, 8)
-	cipher.XORKeyStream(randBytes, randBytes)
+// 	// XOR a byte array of 0s with the stream from the cipher and receive the result in the same array.
+// 	randBytes := make([]byte, 8)
+// 	cipher.XORKeyStream(randBytes, randBytes)
 
-	// Trivially encrypt the random integer.
-	randInt := binary.BigEndian.Uint64(randBytes) % fheMessageModulus
-	randCt := new(tfheCiphertext)
-	randCt.trivialEncrypt(randInt)
-	importCiphertext(accessibleState, randCt)
+// 	// Trivially encrypt the random integer.
+// 	randInt := binary.BigEndian.Uint64(randBytes) % math.BigPow(2, 3).Uint64()
+// 	randCt := new(tfheCiphertext)
+// 	randCt.trivialEncrypt(randInt)
+// 	importCiphertext(accessibleState, randCt)
 
-	// TODO: for testing
-	err = os.WriteFile("/tmp/rand_result", randCt.serialize(), 0644)
-	if err != nil {
-		return nil, err
-	}
-	ctHash := randCt.getHash()
-	return ctHash[:], nil
-}
+// 	// TODO: for testing
+// 	err = os.WriteFile("/tmp/rand_result", randCt.serialize(), 0644)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	ctHash := randCt.getHash()
+// 	return ctHash[:], nil
+// }
 
 type cast struct{}
 
