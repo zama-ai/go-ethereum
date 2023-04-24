@@ -1302,11 +1302,14 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return nil, errors.New("only same type ops are supported for now")
 	}
 
-	result := lhs.ciphertext.add(rhs.ciphertext)
+	result, err := lhs.ciphertext.add(rhs.ciphertext)
+	if err != nil {
+		return nil, err
+	}
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/add_result", result.serialize(), 0644)
+	err = os.WriteFile("/tmp/add_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1557,7 +1560,11 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 	if accessibleState.Interpreter().optimisticRequire == nil {
 		accessibleState.Interpreter().optimisticRequire = ct.ciphertext
 	} else {
-		accessibleState.Interpreter().optimisticRequire = accessibleState.Interpreter().optimisticRequire.mul(ct.ciphertext)
+		optimisticRequire, err := accessibleState.Interpreter().optimisticRequire.mul(ct.ciphertext)
+		if err != nil {
+			return nil, err
+		}
+		accessibleState.Interpreter().optimisticRequire = optimisticRequire
 	}
 	return nil, nil
 }
@@ -1592,11 +1599,14 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
-	result := lhs.ciphertext.lte(rhs.ciphertext)
+	result, err := lhs.ciphertext.lte(rhs.ciphertext)
+	if err != nil {
+		return nil, err
+	}
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/lte_result", result.serialize(), 0644)
+	err = os.WriteFile("/tmp/lte_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1636,11 +1646,14 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
-	result := lhs.ciphertext.sub(rhs.ciphertext)
+	result, err := lhs.ciphertext.sub(rhs.ciphertext)
+	if err != nil {
+		return nil, err
+	}
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/sub_result", result.serialize(), 0644)
+	err = os.WriteFile("/tmp/sub_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1680,11 +1693,14 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
-	result := lhs.ciphertext.mul(rhs.ciphertext)
+	result, err := lhs.ciphertext.mul(rhs.ciphertext)
+	if err != nil {
+		return nil, err
+	}
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/mul_result", result.serialize(), 0644)
+	err = os.WriteFile("/tmp/mul_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1720,11 +1736,14 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
-	result := lhs.ciphertext.lt(rhs.ciphertext)
+	result, err := lhs.ciphertext.lt(rhs.ciphertext)
+	if err != nil {
+		return nil, err
+	}
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/lt_result", result.serialize(), 0644)
+	err = os.WriteFile("/tmp/lt_result", result.serialize(), 0644)
 	if err != nil {
 		return nil, err
 	}

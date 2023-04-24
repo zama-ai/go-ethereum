@@ -64,7 +64,7 @@ func TestTfheAdd(t *testing.T) {
 	ctA.encrypt(a, FheUint8)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, FheUint8)
-	ctRes := ctA.add(ctB)
+	ctRes, _ := ctA.add(ctB)
 	res := ctRes.decrypt()
 	if res != expected {
 		t.Fatalf("%d != %d", expected, res)
@@ -79,7 +79,7 @@ func TestTfheSub(t *testing.T) {
 	ctA.encrypt(a, FheUint8)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, FheUint8)
-	ctRes := ctA.sub(ctB)
+	ctRes, _ := ctA.sub(ctB)
 	res := ctRes.decrypt()
 	if res != expected {
 		t.Fatalf("%d != %d", expected, res)
@@ -94,7 +94,7 @@ func TestTfheMul(t *testing.T) {
 	ctA.encrypt(a, FheUint8)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, FheUint8)
-	ctRes := ctA.mul(ctB)
+	ctRes, _ := ctA.mul(ctB)
 	res := ctRes.decrypt()
 	if res != expected {
 		t.Fatalf("%d != %d", expected, res)
@@ -108,8 +108,8 @@ func TestTfheLte(t *testing.T) {
 	ctA.encrypt(a, FheUint8)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, FheUint8)
-	ctRes1 := ctA.lte(ctB)
-	ctRes2 := ctB.lte(ctA)
+	ctRes1, _ := ctA.lte(ctB)
+	ctRes2, _ := ctB.lte(ctA)
 	res1 := ctRes1.decrypt()
 	res2 := ctRes2.decrypt()
 	if res1 != 0 {
@@ -126,8 +126,8 @@ func TestTfheLt(t *testing.T) {
 	ctA.encrypt(a, FheUint8)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, FheUint8)
-	ctRes1 := ctA.lte(ctB)
-	ctRes2 := ctB.lte(ctA)
+	ctRes1, _ := ctA.lte(ctB)
+	ctRes2, _ := ctB.lte(ctA)
 	res1 := ctRes1.decrypt()
 	res2 := ctRes2.decrypt()
 	if res1 != 0 {

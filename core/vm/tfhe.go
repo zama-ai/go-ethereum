@@ -548,10 +548,15 @@ func (ct *tfheCiphertext) serialize() []byte {
 	return ct.serialization
 }
 
-func (lhs *tfheCiphertext) add(rhs *tfheCiphertext) *tfheCiphertext {
+func (lhs *tfheCiphertext) add(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot add on a non-initialized ciphertext")
 	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
 	C.tfhe_set_server_key(sks)
 	res := new(tfheCiphertext)
 	res.fheUintType = lhs.fheUintType
@@ -563,13 +568,18 @@ func (lhs *tfheCiphertext) add(rhs *tfheCiphertext) *tfheCiphertext {
 	case FheUint32:
 		res.setPtr(C.add_fhe_uint32(lhs.ptr, rhs.ptr))
 	}
-	return res
+	return res, nil
 }
 
-func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) *tfheCiphertext {
+func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot sub on a non-initialized ciphertext")
 	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
 	C.tfhe_set_server_key(sks)
 	res := new(tfheCiphertext)
 	res.fheUintType = lhs.fheUintType
@@ -581,13 +591,18 @@ func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) *tfheCiphertext {
 	case FheUint32:
 		res.setPtr(C.sub_fhe_uint32(lhs.ptr, rhs.ptr))
 	}
-	return res
+	return res, nil
 }
 
-func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) *tfheCiphertext {
+func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot mul on a non-initialized ciphertext")
 	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
 	res := new(tfheCiphertext)
 	res.fheUintType = lhs.fheUintType
 	switch lhs.fheUintType {
@@ -598,13 +613,18 @@ func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) *tfheCiphertext {
 	case FheUint32:
 		res.setPtr(C.mul_fhe_uint32(lhs.ptr, rhs.ptr))
 	}
-	return res
+	return res, nil
 }
 
-func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) *tfheCiphertext {
+func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot lte on a non-initialized ciphertext")
 	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
 	C.tfhe_set_server_key(sks)
 	res := new(tfheCiphertext)
 	res.fheUintType = lhs.fheUintType
@@ -616,13 +636,18 @@ func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) *tfheCiphertext {
 	case FheUint32:
 		res.setPtr(C.le_fhe_uint32(lhs.ptr, rhs.ptr))
 	}
-	return res
+	return res, nil
 }
 
-func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) *tfheCiphertext {
+func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot lt on a non-initialized ciphertext")
 	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
 	res := new(tfheCiphertext)
 	res.fheUintType = lhs.fheUintType
 	switch lhs.fheUintType {
@@ -633,7 +658,7 @@ func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) *tfheCiphertext {
 	case FheUint32:
 		res.setPtr(C.lt_fhe_uint32(lhs.ptr, rhs.ptr))
 	}
-	return res
+	return res, nil
 }
 
 func (ct *tfheCiphertext) decrypt() uint64 {
