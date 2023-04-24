@@ -713,7 +713,7 @@ func (c testCallerAddress) Address() common.Address {
 func newTestScopeConext() *ScopeContext {
 	c := new(ScopeContext)
 	c.Memory = NewMemory()
-	c.Memory.Resize(uint64(fheCiphertextSize) * 3)
+	c.Memory.Resize(uint64(fheCiphertextSize[FheUint8]) * 3)
 	c.Stack = newstack()
 	c.Contract = NewContract(testCallerAddress{}, testContractAddress{}, big.NewInt(10), 100000)
 	return c
@@ -731,7 +731,7 @@ func TestProtectedStorageSstoreSload(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
 	interpreter := newTestInterpreter()
-	ct := verifyCiphertextInTestMemory(interpreter, 2, depth)
+	ct := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8)
 	ctHash := ct.getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)
@@ -769,7 +769,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
 	interpreter := newTestInterpreter()
-	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
+	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)
 	value := uint256FromBig(ctHash.Big())
@@ -789,7 +789,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	if metadata.refCount != 1 {
 		t.Fatalf("metadata.refcount of ciphertext is not 1")
 	}
-	if metadata.length != uint64(fheCiphertextSize) {
+	if metadata.length != uint64(fheCiphertextSize[FheUint8]) {
 		t.Fatalf("metadata.length of ciphertext is incorrect")
 	}
 	ciphertextLocationsToCheck := (metadata.length + 32 - 1) / 32
@@ -866,7 +866,7 @@ func TestOpReturnDelegation(t *testing.T) {
 	depth := 2
 	interpreter := newTestInterpreter()
 	scope := newTestScopeConext()
-	ct := verifyCiphertextInTestMemory(interpreter, 2, depth)
+	ct := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8)
 	ctHash := ct.getHash()
 
 	offset := uint256.NewInt(0)
@@ -894,7 +894,7 @@ func TestOpReturnUnverifyIfNotReturned(t *testing.T) {
 	depth := 2
 	interpreter := newTestInterpreter()
 	scope := newTestScopeConext()
-	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
+	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
 
 	offset := uint256.NewInt(0)
 	len := uint256.NewInt(32)
@@ -915,7 +915,7 @@ func TestOpReturnDoesNotUnverifyIfNotVerified(t *testing.T) {
 	pc := uint64(0)
 	interpreter := newTestInterpreter()
 	scope := newTestScopeConext()
-	ct := verifyCiphertextInTestMemory(interpreter, 2, 4)
+	ct := verifyCiphertextInTestMemory(interpreter, 2, 4, FheUint8)
 	ctHash := ct.getHash()
 
 	// Return from depth 3 to depth 2. However, ct is not verified at 3 and, hence, cannot
@@ -999,7 +999,7 @@ func TestOpCallDelegatesIfHandleInArgs(t *testing.T) {
 		depth := 2
 		interpreter := newTestInterpreter()
 		interpreter.evm.depth = depth
-		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
 		pc, scope := setupOpCall(call, interpreter, ctHash)
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {
@@ -1027,7 +1027,7 @@ func TestOpCallDoesNotDelegateIfHandleNotInArgs(t *testing.T) {
 		depth := 2
 		interpreter := newTestInterpreter()
 		interpreter.evm.depth = depth
-		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth).getHash()
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
 		pc, scope := setupOpCall(call, interpreter, common.Hash{})
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {
@@ -1052,7 +1052,7 @@ func TestOpCallVerifySameCiphertextDeeperInStack(t *testing.T) {
 	for _, call := range callsToTest {
 		interpreter := newTestInterpreter()
 		interpreter.evm.depth = 2
-		ct := verifyCiphertextInTestMemory(interpreter, 2, 2)
+		ct := verifyCiphertextInTestMemory(interpreter, 2, 2, FheUint8)
 
 		pc, scope := setupOpCall(call, interpreter, common.Hash{})
 		_, err := (*call)(&pc, interpreter, scope)
@@ -1079,7 +1079,7 @@ func TestOpCallDoesNotDelegateIfNotVerified(t *testing.T) {
 		verifiedAtDepth := 2
 		interpreter := newTestInterpreter()
 		interpreter.evm.depth = verifiedAtDepth + 1
-		ctHash := verifyCiphertextInTestMemory(interpreter, 2, verifiedAtDepth).getHash()
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, verifiedAtDepth, FheUint8).getHash()
 		pc, scope := setupOpCall(call, interpreter, ctHash)
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {

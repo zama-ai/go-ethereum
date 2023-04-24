@@ -522,16 +522,18 @@ func opMstore8(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 }
 
 // Ciphertext metadata is stored in protected storage, in a 32-byte slot.
-// Currently, we only utilize 16 bytes from the slot.
+// Currently, we only utilize 17 bytes from the slot.
 type ciphertextMetadata struct {
-	refCount uint64
-	length   uint64
+	refCount    uint64
+	length      uint64
+	fheUintType fheUintType
 }
 
 func (m ciphertextMetadata) serialize() [32]byte {
 	u := uint256.NewInt(0)
 	u[0] = m.refCount
 	u[1] = m.length
+	u[2] = uint64(m.fheUintType)
 	return u.Bytes32()
 }
 
@@ -540,6 +542,7 @@ func (m *ciphertextMetadata) deserialize(buf [32]byte) *ciphertextMetadata {
 	u.SetBytes(buf[:])
 	m.refCount = u[0]
 	m.length = u[1]
+	m.fheUintType = fheUintType(u[2])
 	return m
 }
 
@@ -580,7 +583,7 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 			ct = verifiedCt.ciphertext
 		} else {
 			ct = new(tfheCiphertext)
-			err := ct.deserialize(ctBytes)
+			err := ct.deserialize(ctBytes, metadata.fheUintType)
 			if err != nil {
 				exitProcess()
 			}
@@ -612,7 +615,7 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 	if metadataInt.IsZero() {
 		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
 		metadata.refCount = 1
-		metadata.length = uint64(fheCiphertextSize)
+		metadata.length = uint64(fheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
 		ciphertextSlot := newInt(val.Bytes())
 		ciphertextSlot.AddUint64(ciphertextSlot, 1)
 		ctPart32 := make([]byte, 32)
