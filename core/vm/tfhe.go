@@ -700,9 +700,6 @@ func (ct *tfheCiphertext) setPtr(ptr unsafe.Pointer) {
 			C.destroy_fhe_uint32(ct.ptr)
 		})
 	}
-	runtime.SetFinalizer(ct, func(ct *tfheCiphertext) {
-		C.destroy_fhe_uint8(ct.ptr)
-	})
 }
 
 func (ct *tfheCiphertext) getHash() common.Hash {
