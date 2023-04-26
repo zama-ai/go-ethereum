@@ -491,6 +491,7 @@ func (ct *tfheCiphertext) deserialize(in []byte, t fheUintType) error {
 		return errors.New("tfhe ciphertext deserialization failed")
 	}
 	ct.setPtr(ptr)
+	ct.fheUintType = t
 	ct.serialization = in
 	return nil
 }
