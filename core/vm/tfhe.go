@@ -40,7 +40,7 @@ void* deserialize_client_key(BufferView in) {
 }
 
 void checked_set_server_key(void *sks) {
-	int r = set_server_key(sks);
+	const int r = set_server_key(sks);
 	assert(r == 0);
 }
 
