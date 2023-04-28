@@ -1361,7 +1361,6 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 
 	ct := new(tfheCiphertext)
 	err := ct.deserialize(ctBytes, ctType)
-	ct.fheUintType = ctType
 
 	if err != nil {
 		return nil, err
