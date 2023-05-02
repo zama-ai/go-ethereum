@@ -21,8 +21,21 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
+
+var gasProtectedStorageSstore = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8ProtectedStorageSstore,
+	FheUint16: params.FheUint16ProtectedStorageSstore,
+	FheUint32: params.FheUint32ProtectedStorageSstore,
+}
+
+var gasProtectedStorageSload = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8ProtectedStorageSload,
+	FheUint16: params.FheUint16ProtectedStorageSload,
+	FheUint32: params.FheUint32ProtectedStorageSload,
+}
 
 func makeGasSStoreFunc(clearingRefund uint64) gasFunc {
 	return func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
@@ -50,11 +63,15 @@ func makeGasSStoreFunc(clearingRefund uint64) gasFunc {
 			}
 		}
 		value := common.Hash(y.Bytes32())
-
 		if current == value { // noop (1)
 			// EIP 2200 original clause:
 			//		return params.SloadGasEIP2200, nil
 			return cost + params.WarmStorageReadCostEIP2929, nil // SLOAD_GAS
+		}
+		// TODO: For now, every SSTORE referring to a ciphertext incurs the same cost, irrespective
+		// of the original and current values of the slot. Refunds for protected storage are not taken into account.
+		if ct, ok := evm.interpreter.verifiedCiphertexts[value]; ok {
+			cost += gasProtectedStorageSstore[ct.ciphertext.fheUintType]
 		}
 		original := evm.StateDB.GetCommittedState(contract.Address(), x.Bytes32())
 		if original == current {
@@ -103,14 +120,27 @@ func makeGasSStoreFunc(clearingRefund uint64) gasFunc {
 func gasSLoadEIP2929(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
 	loc := stack.peek()
 	slot := common.Hash(loc.Bytes32())
+	value := evm.StateDB.GetState(contract.Address(), slot)
+
+	// If the value we load is a ciphertext handle, add to the gas cost
+	protectedStorageGas := uint64(0)
+	if _, ok := evm.interpreter.verifiedCiphertexts[value]; !ok {
+		protectedStorage := crypto.CreateProtectedStorageContractAddress(contract.Address())
+		metadataInt := newInt(evm.StateDB.GetState(protectedStorage, value).Bytes())
+		if !metadataInt.IsZero() {
+			metadata := newCiphertextMetadata(metadataInt.Bytes32())
+			protectedStorageGas = gasProtectedStorageSload[metadata.fheUintType]
+		}
+	}
+
 	// Check slot presence in the access list
 	if _, slotPresent := evm.StateDB.SlotInAccessList(contract.Address(), slot); !slotPresent {
 		// If the caller cannot afford the cost, this change will be rolled back
 		// If he does afford it, we can skip checking the same thing later on, during execution
 		evm.StateDB.AddSlotToAccessList(contract.Address(), slot)
-		return params.ColdSloadCostEIP2929, nil
+		return params.ColdSloadCostEIP2929 + protectedStorageGas, nil
 	}
-	return params.WarmStorageReadCostEIP2929, nil
+	return params.WarmStorageReadCostEIP2929 + protectedStorageGas, nil
 }
 
 // gasExtCodeCopyEIP2929 implements extcodecopy according to EIP-2929

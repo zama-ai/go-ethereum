@@ -158,6 +158,53 @@ const (
 	// up to half the consumed gas could be refunded. Redefined as 1/5th in EIP-3529
 	RefundQuotient        uint64 = 2
 	RefundQuotientEIP3529 uint64 = 5
+
+	// FHE operation costs depend on tfhe-rs performance and hardware acceleration. These values will most certainly change.
+	FheUint8AddSubGas  uint64 = 5000
+	FheUint16AddSubGas uint64 = FheUint8AddSubGas * 2
+	FheUint32AddSubGas uint64 = FheUint16AddSubGas * 4
+	FheUint8MulGas     uint64 = 9000
+	FheUint16MulGas    uint64 = FheUint8MulGas * 3
+	FheUint32MulGas    uint64 = FheUint16MulGas * 10
+	FheUint8LteGas     uint64 = 3300
+	FheUint16LteGas    uint64 = 5000
+	FheUint32LteGas    uint64 = 11000
+
+	// TODO: Cost will depend on the complexity of doing reencryption by the oracle.
+	FheUint8ReencryptGas  uint64 = 15000
+	FheUint16ReencryptGas uint64 = FheUint8ReencryptGas * 2
+	FheUint32ReencryptGas uint64 = FheUint16ReencryptGas * 4
+
+	// As of now, verification costs only cover ciphertext deserialization and assume there is no ZKPoK to verify.
+	FheUint8VerifyGas  uint64 = 500
+	FheUint16VerifyGas uint64 = 600
+	FheUint32VerifyGas uint64 = 2000
+
+	// TODO: Cost will depend on the complexity of doing decryption by the oracle.
+	FheUint8RequireGas  uint64 = 10000
+	FheUint16RequireGas uint64 = FheUint8RequireGas * 2
+	FheUint32RequireGas uint64 = FheUint16RequireGas * 4
+
+	// TODO: As of now, only support FheUint32 due to inability to cast between types.
+	// If there is at least one optimistic require, we need to decrypt it as it was a normal FHE require.
+	// For every subsequent optimistic require, we need to multiply it with the current require value.
+	FheUint32OptimisticRequireGas    uint64 = FheUint32RequireGas
+	FheUint32OptimisticRequireMulGas uint64 = FheUint32MulGas
+
+	// TODO: This will change once we have an FHE-based random generaration with different types.
+	FheRandGas uint64 = NetSstoreCleanGas + ColdSloadCostEIP2929
+
+	// TODO: The values here are chosen somewhat arbitrarily (at least the 8 bit ones). Also, we don't
+	// take into account whether a ciphertext existed (either "current" or "original") for the given handle.
+	// Finally, costs are likely to change in the future.
+	FheUint8ProtectedStorageSstore  uint64 = NetSstoreInitGas * 3
+	FheUint16ProtectedStorageSstore uint64 = FheUint8ProtectedStorageSstore * 2
+	FheUint32ProtectedStorageSstore uint64 = FheUint16ProtectedStorageSstore * 4
+
+	// TODO: We don't take whether the slot is cold or warm into consideration.
+	FheUint8ProtectedStorageSload  uint64 = ColdSloadCostEIP2929 * 3
+	FheUint16ProtectedStorageSload uint64 = FheUint8ProtectedStorageSload * 2
+	FheUint32ProtectedStorageSload uint64 = FheUint16ProtectedStorageSload * 4
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations

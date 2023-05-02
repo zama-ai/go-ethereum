@@ -51,7 +51,7 @@ type PrecompileAccessibleState interface {
 // requires a deterministic gas count based on the input size of the Run method of the
 // contract.
 type PrecompiledContract interface {
-	RequiredGas(input []byte) uint64 // RequiredGas calculates the contract gas use
+	RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 // RequiredGas calculates the contract gas use
 	Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) (ret []byte, err error)
 }
 
@@ -238,7 +238,7 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 func RunPrecompiledContract(p PrecompiledContract, accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	accessibleState.Interpreter().evm.depth++
 	defer func() { accessibleState.Interpreter().evm.depth-- }()
-	gasCost := p.RequiredGas(input)
+	gasCost := p.RequiredGas(accessibleState, input)
 	if suppliedGas < gasCost {
 		return nil, 0, ErrOutOfGas
 	}
@@ -250,7 +250,7 @@ func RunPrecompiledContract(p PrecompiledContract, accessibleState PrecompileAcc
 // ECRECOVER implemented as a native contract.
 type ecrecover struct{}
 
-func (c *ecrecover) RequiredGas(input []byte) uint64 {
+func (c *ecrecover) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.EcrecoverGas
 }
 
@@ -292,7 +292,7 @@ type sha256hash struct{}
 //
 // This method does not require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
-func (c *sha256hash) RequiredGas(input []byte) uint64 {
+func (c *sha256hash) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
 }
 func (c *sha256hash) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -307,7 +307,7 @@ type ripemd160hash struct{}
 //
 // This method does not require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
-func (c *ripemd160hash) RequiredGas(input []byte) uint64 {
+func (c *ripemd160hash) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Ripemd160PerWordGas + params.Ripemd160BaseGas
 }
 func (c *ripemd160hash) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -323,7 +323,7 @@ type dataCopy struct{}
 //
 // This method does not require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
-func (c *dataCopy) RequiredGas(input []byte) uint64 {
+func (c *dataCopy) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
 func (c *dataCopy) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -383,7 +383,7 @@ func modexpMultComplexity(x *big.Int) *big.Int {
 }
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bigModExp) RequiredGas(input []byte) uint64 {
+func (c *bigModExp) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	var (
 		baseLen = new(big.Int).SetBytes(getData(input, 0, 32))
 		expLen  = new(big.Int).SetBytes(getData(input, 32, 32))
@@ -522,7 +522,7 @@ func runBn256Add(input []byte) ([]byte, error) {
 type bn256AddIstanbul struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bn256AddIstanbul) RequiredGas(input []byte) uint64 {
+func (c *bn256AddIstanbul) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bn256AddGasIstanbul
 }
 
@@ -535,7 +535,7 @@ func (c *bn256AddIstanbul) Run(accessibleState PrecompileAccessibleState, caller
 type bn256AddByzantium struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bn256AddByzantium) RequiredGas(input []byte) uint64 {
+func (c *bn256AddByzantium) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bn256AddGasByzantium
 }
 
@@ -560,7 +560,7 @@ func runBn256ScalarMul(input []byte) ([]byte, error) {
 type bn256ScalarMulIstanbul struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bn256ScalarMulIstanbul) RequiredGas(input []byte) uint64 {
+func (c *bn256ScalarMulIstanbul) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bn256ScalarMulGasIstanbul
 }
 
@@ -573,7 +573,7 @@ func (c *bn256ScalarMulIstanbul) Run(accessibleState PrecompileAccessibleState, 
 type bn256ScalarMulByzantium struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bn256ScalarMulByzantium) RequiredGas(input []byte) uint64 {
+func (c *bn256ScalarMulByzantium) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bn256ScalarMulGasByzantium
 }
 
@@ -628,7 +628,7 @@ func runBn256Pairing(input []byte) ([]byte, error) {
 type bn256PairingIstanbul struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bn256PairingIstanbul) RequiredGas(input []byte) uint64 {
+func (c *bn256PairingIstanbul) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bn256PairingBaseGasIstanbul + uint64(len(input)/192)*params.Bn256PairingPerPointGasIstanbul
 }
 
@@ -641,7 +641,7 @@ func (c *bn256PairingIstanbul) Run(accessibleState PrecompileAccessibleState, ca
 type bn256PairingByzantium struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bn256PairingByzantium) RequiredGas(input []byte) uint64 {
+func (c *bn256PairingByzantium) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bn256PairingBaseGasByzantium + uint64(len(input)/192)*params.Bn256PairingPerPointGasByzantium
 }
 
@@ -651,7 +651,7 @@ func (c *bn256PairingByzantium) Run(accessibleState PrecompileAccessibleState, c
 
 type blake2F struct{}
 
-func (c *blake2F) RequiredGas(input []byte) uint64 {
+func (c *blake2F) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	// If the input is malformed, we can't calculate the gas, return 0 and let the
 	// actual call choke and fault.
 	if len(input) != blake2FInputLength {
@@ -721,7 +721,7 @@ var (
 type bls12381G1Add struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381G1Add) RequiredGas(input []byte) uint64 {
+func (c *bls12381G1Add) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381G1AddGas
 }
 
@@ -759,7 +759,7 @@ func (c *bls12381G1Add) Run(accessibleState PrecompileAccessibleState, caller co
 type bls12381G1Mul struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381G1Mul) RequiredGas(input []byte) uint64 {
+func (c *bls12381G1Mul) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381G1MulGas
 }
 
@@ -795,7 +795,7 @@ func (c *bls12381G1Mul) Run(accessibleState PrecompileAccessibleState, caller co
 type bls12381G1MultiExp struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381G1MultiExp) RequiredGas(input []byte) uint64 {
+func (c *bls12381G1MultiExp) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	// Calculate G1 point, scalar value pair length
 	k := len(input) / 160
 	if k == 0 {
@@ -852,7 +852,7 @@ func (c *bls12381G1MultiExp) Run(accessibleState PrecompileAccessibleState, call
 type bls12381G2Add struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381G2Add) RequiredGas(input []byte) uint64 {
+func (c *bls12381G2Add) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381G2AddGas
 }
 
@@ -890,7 +890,7 @@ func (c *bls12381G2Add) Run(accessibleState PrecompileAccessibleState, caller co
 type bls12381G2Mul struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381G2Mul) RequiredGas(input []byte) uint64 {
+func (c *bls12381G2Mul) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381G2MulGas
 }
 
@@ -926,7 +926,7 @@ func (c *bls12381G2Mul) Run(accessibleState PrecompileAccessibleState, caller co
 type bls12381G2MultiExp struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381G2MultiExp) RequiredGas(input []byte) uint64 {
+func (c *bls12381G2MultiExp) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	// Calculate G2 point, scalar value pair length
 	k := len(input) / 288
 	if k == 0 {
@@ -983,7 +983,7 @@ func (c *bls12381G2MultiExp) Run(accessibleState PrecompileAccessibleState, call
 type bls12381Pairing struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381Pairing) RequiredGas(input []byte) uint64 {
+func (c *bls12381Pairing) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381PairingBaseGas + uint64(len(input)/384)*params.Bls12381PairingPerPairGas
 }
 
@@ -1062,7 +1062,7 @@ func decodeBLS12381FieldElement(in []byte) ([]byte, error) {
 type bls12381MapG1 struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381MapG1) RequiredGas(input []byte) uint64 {
+func (c *bls12381MapG1) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381MapG1Gas
 }
 
@@ -1097,7 +1097,7 @@ func (c *bls12381MapG1) Run(accessibleState PrecompileAccessibleState, caller co
 type bls12381MapG2 struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *bls12381MapG2) RequiredGas(input []byte) uint64 {
+func (c *bls12381MapG2) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return params.Bls12381MapG2Gas
 }
 
@@ -1272,25 +1272,75 @@ func importRandomCiphertext(accessibleState PrecompileAccessibleState, t fheUint
 	return ctHash[:]
 }
 
+func get2VerifiedOperands(accessibleState PrecompileAccessibleState, input []byte) (lhs *verifiedCiphertext, rhs *verifiedCiphertext, err error) {
+	if len(input) != 64 {
+		return nil, nil, errors.New("input needs to contain two 256-bit sized values")
+	}
+	lhs = getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if lhs == nil {
+		return nil, nil, errors.New("unverified ciphertext handle")
+	}
+	rhs = getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
+	if rhs == nil {
+		return nil, nil, errors.New("unverified ciphertext handle")
+	}
+	err = nil
+	return
+}
+
+var fheAddSubGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8AddSubGas,
+	FheUint16: params.FheUint16AddSubGas,
+	FheUint32: params.FheUint32AddSubGas,
+}
+
+var fheMulGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8MulGas,
+	FheUint16: params.FheUint16MulGas,
+	FheUint32: params.FheUint32MulGas,
+}
+
+var fheLteGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8LteGas,
+	FheUint16: params.FheUint16LteGas,
+	FheUint32: params.FheUint32LteGas,
+}
+
+var fheReencryptGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8ReencryptGas,
+	FheUint16: params.FheUint16ReencryptGas,
+	FheUint32: params.FheUint32ReencryptGas,
+}
+
+var fheVerifyGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8VerifyGas,
+	FheUint16: params.FheUint16VerifyGas,
+	FheUint32: params.FheUint32VerifyGas,
+}
+
+var fheRequireGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8RequireGas,
+	FheUint16: params.FheUint16RequireGas,
+	FheUint32: params.FheUint32RequireGas,
+}
+
 type fheAdd struct{}
 
-func (e *fheAdd) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *fheAdd) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return 0
+	}
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return 0
+	}
+	return fheAddSubGasCosts[lhs.ciphertext.fheUintType]
 }
 
 func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if len(input) != 64 {
-		return nil, errors.New("input needs to contain two 256-bit sized values")
-	}
-
-	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if lhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
-	}
-	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if rhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return nil, err
 	}
 
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
@@ -1341,9 +1391,12 @@ func exitProcess() {
 
 type verifyCiphertext struct{}
 
-func (e *verifyCiphertext) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *verifyCiphertext) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	if len(input) <= 0 {
+		return 0
+	}
+	ctType := fheUintType(input[len(input)-1])
+	return fheVerifyGasCosts[ctType]
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1384,9 +1437,15 @@ func toEVMBytes(input []byte) []byte {
 
 type reencrypt struct{}
 
-func (e *reencrypt) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *reencrypt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	if len(input) != 32 {
+		return 0
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		return 0
+	}
+	return fheReencryptGasCosts[ct.ciphertext.fheUintType]
 }
 
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1410,9 +1469,15 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 
 type require struct{}
 
-func (e *require) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *require) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	if len(input) != 32 {
+		return 0
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		return 0
+	}
+	return fheRequireGasCosts[ct.ciphertext.fheUintType]
 }
 
 type requireMessage struct {
@@ -1519,8 +1584,8 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	if !accessibleState.Interpreter().evm.Commit {
 		return nil, nil
 	}
-	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
-	if !ok {
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
 		return nil, errors.New("unverified ciphertext handle")
 	}
 	if !evaluateRequire(ct.ciphertext) {
@@ -1531,9 +1596,21 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 
 type optimisticRequire struct{}
 
-func (e *optimisticRequire) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *optimisticRequire) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	if len(input) != 32 {
+		return 0
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		return 0
+	}
+	if ct.ciphertext.fheUintType != FheUint32 {
+		return 0
+	}
+	if accessibleState.Interpreter().optimisticRequire == nil {
+		return params.FheUint32OptimisticRequireGas
+	}
+	return params.FheUint32OptimisticRequireMulGas
 }
 
 func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1551,6 +1628,9 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if !ok {
 		return nil, errors.New("unverified ciphertext handle")
+	}
+	if ct.ciphertext.fheUintType != FheUint32 {
+		return nil, errors.New("optimistic require currently only supports 32 bit FHE unsigned intergers")
 	}
 	// If this is the first optimistic require, just assign it.
 	// If there is already an optimistic one, just multiply it with the incoming one. Here, we assume
@@ -1570,23 +1650,21 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 
 type fheLte struct{}
 
-func (e *fheLte) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *fheLte) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return 0
+	}
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return 0
+	}
+	return fheLteGasCosts[lhs.ciphertext.fheUintType]
 }
 
 func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if len(input) != 64 {
-		return nil, errors.New("input needs to contain two 256-bit sized values")
-	}
-
-	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if lhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
-	}
-	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if rhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
@@ -1617,23 +1695,16 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 type fheSub struct{}
 
-func (e *fheSub) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *fheSub) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of add, because add and sub costs are currently the same.
+	add := fheAdd{}
+	return add.RequiredGas(accessibleState, input)
 }
 
 func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if len(input) != 64 {
-		return nil, errors.New("input needs to contain two 256-bit sized values")
-	}
-
-	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if lhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
-	}
-	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if rhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
@@ -1664,23 +1735,21 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 type fheMul struct{}
 
-func (e *fheMul) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *fheMul) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return 0
+	}
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		return 0
+	}
+	return fheMulGasCosts[lhs.ciphertext.fheUintType]
 }
 
 func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if len(input) != 64 {
-		return nil, errors.New("input needs to contain two 256-bit sized values")
-	}
-
-	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if lhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
-	}
-	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if rhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
@@ -1711,23 +1780,16 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 type fheLt struct{}
 
-func (e *fheLt) RequiredGas(input []byte) uint64 {
-	// TODO
-	return 8
+func (e *fheLt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of lte, because lte and lt costs are currently the same.
+	lte := fheLte{}
+	return lte.RequiredGas(accessibleState, input)
 }
 
 func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if len(input) != 64 {
-		return nil, errors.New("input needs to contain two 256-bit sized values")
-	}
-
-	lhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if lhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
-	}
-	rhs := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[32:64]))
-	if rhs == nil {
-		return nil, errors.New("unverified ciphertext handle")
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		return nil, err
 	}
 
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
@@ -1832,7 +1894,7 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 
 type cast struct{}
 
-func (e *cast) RequiredGas(input []byte) uint64 {
+func (e *cast) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return 0
 }
 
@@ -1845,7 +1907,7 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 
 type faucet struct{}
 
-func (e *faucet) RequiredGas(input []byte) uint64 {
+func (e *faucet) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	return 0
 }
 
