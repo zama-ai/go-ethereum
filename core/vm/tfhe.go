@@ -463,21 +463,19 @@ func init() {
 	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
 	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
 
-	sks_bytes, err := os.ReadFile(networkKeysDir + "sks")
+	sksBytes, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
 		fmt.Print("WARNING: file sks not found.\n")
 		return
 	}
-	sks = C.deserialize_server_key(toBufferView(sks_bytes))
+	sks = C.deserialize_server_key(toBufferView(sksBytes))
 
-	cks_bytes, err := os.ReadFile(networkKeysDir + "cks")
+	cksBytes, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
 		fmt.Print("WARNING: file cks not found.\n")
 		return
 	}
-
-	sks = C.deserialize_server_key(toBufferView(sks_bytes))
-	cks = C.deserialize_client_key(toBufferView(cks_bytes))
+	cks = C.deserialize_client_key(toBufferView(cksBytes))
 
 	// Cannot use trivial encryption yet as it is not exposed by tfhe-rs
 	// ct := new(tfheCiphertext)
