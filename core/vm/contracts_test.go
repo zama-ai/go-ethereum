@@ -453,7 +453,20 @@ func toPrecompileInput(hashes ...common.Hash) []byte {
 	return ret
 }
 
-func TestFheAdd8(t *testing.T) {
+func FheAdd(t *testing.T, fheUintType fheUintType) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs + rhs
 	c := &fheAdd{}
 	depth := 1
 	state := newTestState()
@@ -461,8 +474,8 @@ func TestFheAdd8(t *testing.T) {
 	state.interpreter.evm.Commit = true
 	addr := common.Address{}
 	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	rhsHash := verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
 	input := toPrecompileInput(lhsHash, rhsHash)
 	out, err := c.Run(state, addr, addr, input, readOnly)
 	if err != nil {
@@ -473,461 +486,255 @@ func TestFheAdd8(t *testing.T) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted := res.ciphertext.decrypt()
-	if decrypted != 2 {
+	if decrypted != uint64(expected) {
 		t.Fatalf("invalid decrypted result")
 	}
+}
+
+func FheSub(t *testing.T, fheUintType fheUintType) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs - rhs
+	println(expected)
+	c := &fheSub{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.Commit = true
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	rhsHash := verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	input := toPrecompileInput(lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted := res.ciphertext.decrypt()
+	if decrypted != expected {
+		t.Fatalf("invalid decrypted result")
+	}
+}
+
+func FheMul(t *testing.T, fheUintType fheUintType) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 169
+		rhs = 5
+	case FheUint32:
+		lhs = 137
+		rhs = 17
+	}
+	expected := lhs * rhs
+	c := &fheMul{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.Commit = true
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	rhsHash := verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	input := toPrecompileInput(lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted := res.ciphertext.decrypt()
+	if decrypted != expected {
+		t.Fatalf("invalid decrypted result")
+	}
+}
+
+func FheLte(t *testing.T, fheUintType fheUintType) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	c := &fheLte{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.Commit = true
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	rhsHash := verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+
+	// lhs <= rhs
+	input1 := toPrecompileInput(lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted := res.ciphertext.decrypt()
+	if decrypted != 0 {
+		t.Fatalf("invalid decrypted result")
+	}
+
+	// rhs <= lhs
+	input2 := toPrecompileInput(rhsHash, lhsHash)
+	out, err = c.Run(state, addr, addr, input2, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted = res.ciphertext.decrypt()
+	if decrypted != 1 {
+		t.Fatalf("invalid decrypted result")
+	}
+}
+
+func FheLt(t *testing.T, fheUintType fheUintType) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+
+	c := &fheLt{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.Commit = true
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	rhsHash := verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+
+	// lhs < rhs
+	input1 := toPrecompileInput(lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted := res.ciphertext.decrypt()
+	if decrypted != 0 {
+		t.Fatalf("invalid decrypted result")
+	}
+
+	// rhs < lhs
+	input2 := toPrecompileInput(rhsHash, lhsHash)
+	out, err = c.Run(state, addr, addr, input2, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted = res.ciphertext.decrypt()
+	if decrypted != 1 {
+		t.Fatalf("invalid decrypted result")
+	}
+}
+
+func TestFheAdd8(t *testing.T) {
+	FheAdd(t, FheUint8)
 }
 
 func TestFheSub8(t *testing.T) {
-	c := &fheSub{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 2, depth, FheUint8).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheSub(t, FheUint8)
 }
 
 func TestFheMul8(t *testing.T) {
-	c := &fheMul{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 2, depth, FheUint8).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 2 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheMul(t, FheUint8)
 }
 
 func TestFheLte8(t *testing.T) {
-	c := &fheLte{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 2, depth, FheUint8).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
-
-	// 2 <= 1
-	input1 := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input1, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
-		t.Fatalf("invalid decrypted result")
-	}
-
-	// 1 <= 2
-	input2 := toPrecompileInput(rhsHash, lhsHash)
-	out, err = c.Run(state, addr, addr, input2, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheLte(t, FheUint8)
 }
 
 func TestFheLt8(t *testing.T) {
-	c := &fheLt{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 2, depth, FheUint8).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
-
-	// 2 < 1
-	input1 := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input1, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
-		t.Fatalf("invalid decrypted result")
-	}
-
-	// 1 < 2
-	input2 := toPrecompileInput(rhsHash, lhsHash)
-	out, err = c.Run(state, addr, addr, input2, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheLt(t, FheUint8)
 }
 
 func TestFheAdd16(t *testing.T) {
-	c := &fheAdd{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 5001, depth, FheUint16).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 3002, depth, FheUint16).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 8003 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheAdd(t, FheUint16)
 }
 
 func TestFheSub16(t *testing.T) {
-	c := &fheSub{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 5002, depth, FheUint16).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 3001, depth, FheUint16).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 2001 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheSub(t, FheUint16)
 }
 
 func TestFheMul16(t *testing.T) {
-	c := &fheMul{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 16, depth, FheUint16).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 17, depth, FheUint16).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 272 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheMul(t, FheUint16)
 }
 
 func TestFheLte16(t *testing.T) {
-	c := &fheLte{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 9273, depth, FheUint16).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 7859, depth, FheUint16).getHash()
-
-	// 2 <= 1
-	input1 := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input1, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
-		t.Fatalf("invalid decrypted result")
-	}
-
-	// 1 <= 2
-	input2 := toPrecompileInput(rhsHash, lhsHash)
-	out, err = c.Run(state, addr, addr, input2, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheLte(t, FheUint16)
 }
 
 func TestFheLt16(t *testing.T) {
-	c := &fheLt{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 6584, depth, FheUint16).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 4819, depth, FheUint16).getHash()
-
-	// 2 < 1
-	input1 := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input1, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
-		t.Fatalf("invalid decrypted result")
-	}
-
-	// 1 < 2
-	input2 := toPrecompileInput(rhsHash, lhsHash)
-	out, err = c.Run(state, addr, addr, input2, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheLt(t, FheUint16)
 }
 
 func TestFheAdd32(t *testing.T) {
-	c := &fheAdd{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 4000003, depth, FheUint32).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 4000005, depth, FheUint32).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 8000008 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheAdd(t, FheUint32)
 }
 
 func TestFheSub32(t *testing.T) {
-	c := &fheSub{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 4000005, depth, FheUint32).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 4000003, depth, FheUint32).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 2 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheSub(t, FheUint32)
 }
 
 func TestFheMul32(t *testing.T) {
-	c := &fheMul{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 256, depth, FheUint32).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 128, depth, FheUint32).getHash()
-	input := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 32768 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheMul(t, FheUint32)
 }
 
 func TestFheLte32(t *testing.T) {
-	c := &fheLte{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 99999999, depth, FheUint32).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 99999998, depth, FheUint32).getHash()
-
-	// 2 <= 1
-	input1 := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input1, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
-		t.Fatalf("invalid decrypted result")
-	}
-
-	// 1 <= 2
-	input2 := toPrecompileInput(rhsHash, lhsHash)
-	out, err = c.Run(state, addr, addr, input2, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheLte(t, FheUint32)
 }
 
 func TestFheLt32(t *testing.T) {
-	c := &fheLt{}
-	depth := 1
-	state := newTestState()
-	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
-	addr := common.Address{}
-	readOnly := false
-	lhsHash := verifyCiphertextInTestMemory(state.interpreter, 4294967295, depth, FheUint32).getHash()
-	rhsHash := verifyCiphertextInTestMemory(state.interpreter, 4294967294, depth, FheUint32).getHash()
-
-	// 2 < 1
-	input1 := toPrecompileInput(lhsHash, rhsHash)
-	out, err := c.Run(state, addr, addr, input1, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
-		t.Fatalf("invalid decrypted result")
-	}
-
-	// 1 < 2
-	input2 := toPrecompileInput(rhsHash, lhsHash)
-	out, err = c.Run(state, addr, addr, input2, readOnly)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-	if res == nil {
-		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-	}
-	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
-		t.Fatalf("invalid decrypted result")
-	}
+	FheLt(t, FheUint32)
 }
 
 // func TestFheRand(t *testing.T) {

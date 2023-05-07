@@ -24,21 +24,37 @@ import (
 // TODO: Don't rely on global keys that are loaded from disk in init(). Instead,
 // generate keys on demand in the test.
 
-func TestTfheCksEncryptDecrypt(t *testing.T) {
-	val := uint64(2)
+func TfheCksEncryptDecrypt(t *testing.T, fheUintType fheUintType) {
+	var val uint64
+	switch fheUintType {
+	case FheUint8:
+		val = 2
+	case FheUint16:
+		val = 1337
+	case FheUint32:
+		val = 1333337
+	}
 	ct := new(tfheCiphertext)
-	ct.encrypt(val, FheUint8)
+	ct.encrypt(val, fheUintType)
 	res := ct.decrypt()
 	if res != val {
 		t.Fatalf("%d != %d", val, res)
 	}
 }
 
-func TestTfheSerializeDeserialize(t *testing.T) {
-	val := uint64(2)
-	ctBytes := clientKeyEncrypt(val, FheUint8)
+func TfheSerializeDeserialize(t *testing.T, fheUintType fheUintType) {
+	var val uint64
+	switch fheUintType {
+	case FheUint8:
+		val = 2
+	case FheUint16:
+		val = 1337
+	case FheUint32:
+		val = 1333337
+	}
+	ctBytes := clientKeyEncrypt(val, fheUintType)
 	ct := new(tfheCiphertext)
-	err := ct.deserialize(ctBytes, FheUint8)
+	err := ct.deserialize(ctBytes, fheUintType)
 	if err != nil {
 		t.Fatalf("deserialization failed")
 	}
@@ -48,22 +64,32 @@ func TestTfheSerializeDeserialize(t *testing.T) {
 	}
 }
 
-func TestTfheDeserializeFailure(t *testing.T) {
+func TfheDeserializeFailure(t *testing.T, fheUintType fheUintType) {
 	ct := new(tfheCiphertext)
-	err := ct.deserialize(make([]byte, 10), FheUint8)
+	err := ct.deserialize(make([]byte, 10), fheUintType)
 	if err == nil {
 		t.Fatalf("deserialization must have failed")
 	}
 }
 
-func TestTfheAdd(t *testing.T) {
-	a := uint64(1)
-	b := uint64(1)
-	expected := uint64(2)
+func TfheAdd(t *testing.T, fheUintType fheUintType) {
+	var a, b uint64
+	switch fheUintType {
+	case FheUint8:
+		a = 2
+		b = 1
+	case FheUint16:
+		a = 4283
+		b = 1337
+	case FheUint32:
+		a = 1333337
+		b = 133337
+	}
+	expected := a + b
 	ctA := new(tfheCiphertext)
-	ctA.encrypt(a, FheUint8)
+	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
-	ctB.encrypt(b, FheUint8)
+	ctB.encrypt(b, fheUintType)
 	ctRes, _ := ctA.add(ctB)
 	res := ctRes.decrypt()
 	if res != expected {
@@ -71,14 +97,24 @@ func TestTfheAdd(t *testing.T) {
 	}
 }
 
-func TestTfheSub(t *testing.T) {
-	a := uint64(2)
-	b := uint64(1)
-	expected := uint64(1)
+func TfheSub(t *testing.T, fheUintType fheUintType) {
+	var a, b uint64
+	switch fheUintType {
+	case FheUint8:
+		a = 2
+		b = 1
+	case FheUint16:
+		a = 4283
+		b = 1337
+	case FheUint32:
+		a = 1333337
+		b = 133337
+	}
+	expected := a - b
 	ctA := new(tfheCiphertext)
-	ctA.encrypt(a, FheUint8)
+	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
-	ctB.encrypt(b, FheUint8)
+	ctB.encrypt(b, fheUintType)
 	ctRes, _ := ctA.sub(ctB)
 	res := ctRes.decrypt()
 	if res != expected {
@@ -86,14 +122,24 @@ func TestTfheSub(t *testing.T) {
 	}
 }
 
-func TestTfheMul(t *testing.T) {
-	a := uint64(2)
-	b := uint64(1)
-	expected := uint64(2)
+func TfheMul(t *testing.T, fheUintType fheUintType) {
+	var a, b uint64
+	switch fheUintType {
+	case FheUint8:
+		a = 2
+		b = 1
+	case FheUint16:
+		a = 169
+		b = 5
+	case FheUint32:
+		a = 137
+		b = 17
+	}
+	expected := a * b
 	ctA := new(tfheCiphertext)
-	ctA.encrypt(a, FheUint8)
+	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
-	ctB.encrypt(b, FheUint8)
+	ctB.encrypt(b, fheUintType)
 	ctRes, _ := ctA.mul(ctB)
 	res := ctRes.decrypt()
 	if res != expected {
@@ -101,9 +147,47 @@ func TestTfheMul(t *testing.T) {
 	}
 }
 
-func TestTfheLte(t *testing.T) {
-	a := uint64(2)
-	b := uint64(1)
+func TfheLte(t *testing.T, fheUintType fheUintType) {
+	var a, b uint64
+	switch fheUintType {
+	case FheUint8:
+		a = 2
+		b = 1
+	case FheUint16:
+		a = 4283
+		b = 1337
+	case FheUint32:
+		a = 1333337
+		b = 133337
+	}
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes1, _ := ctA.lte(ctB)
+	ctRes2, _ := ctB.lte(ctA)
+	res1 := ctRes1.decrypt()
+	res2 := ctRes2.decrypt()
+	if res1 != 0 {
+		t.Fatalf("%d != %d", 0, res1)
+	}
+	if res2 != 1 {
+		t.Fatalf("%d != %d", 0, res2)
+	}
+}
+func TfheLt(t *testing.T, fheUintType fheUintType) {
+	var a, b uint64
+	switch fheUintType {
+	case FheUint8:
+		a = 2
+		b = 1
+	case FheUint16:
+		a = 4283
+		b = 1337
+	case FheUint32:
+		a = 1333337
+		b = 133337
+	}
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, FheUint8)
 	ctB := new(tfheCiphertext)
@@ -119,23 +203,100 @@ func TestTfheLte(t *testing.T) {
 		t.Fatalf("%d != %d", 0, res2)
 	}
 }
-func TestTfheLt(t *testing.T) {
-	a := uint64(2)
-	b := uint64(1)
-	ctA := new(tfheCiphertext)
-	ctA.encrypt(a, FheUint8)
-	ctB := new(tfheCiphertext)
-	ctB.encrypt(b, FheUint8)
-	ctRes1, _ := ctA.lte(ctB)
-	ctRes2, _ := ctB.lte(ctA)
-	res1 := ctRes1.decrypt()
-	res2 := ctRes2.decrypt()
-	if res1 != 0 {
-		t.Fatalf("%d != %d", 0, res1)
-	}
-	if res2 != 1 {
-		t.Fatalf("%d != %d", 0, res2)
-	}
+
+func TestTfheCksEncryptDecrypt8(t *testing.T) {
+	TfheCksEncryptDecrypt(t, FheUint8)
+}
+
+func TestTfheCksEncryptDecrypt16(t *testing.T) {
+	TfheCksEncryptDecrypt(t, FheUint16)
+}
+
+func TestTfheCksEncryptDecrypt32(t *testing.T) {
+	TfheCksEncryptDecrypt(t, FheUint32)
+}
+
+func TestTfheSerializeDeserialize8(t *testing.T) {
+	TfheSerializeDeserialize(t, FheUint8)
+}
+
+func TestTfheSerializeDeserialize16(t *testing.T) {
+	TfheSerializeDeserialize(t, FheUint16)
+}
+
+func TestTfheSerializeDeserialize32(t *testing.T) {
+	TfheSerializeDeserialize(t, FheUint32)
+}
+
+func TestTfheDeserializeFailure8(t *testing.T) {
+	TfheDeserializeFailure(t, FheUint8)
+}
+
+func TestTfheDeserializeFailure16(t *testing.T) {
+	TfheDeserializeFailure(t, FheUint16)
+}
+
+func TestTfheDeserializeFailure32(t *testing.T) {
+	TfheDeserializeFailure(t, FheUint32)
+}
+
+func TestTfheAdd8(t *testing.T) {
+	TfheAdd(t, FheUint8)
+}
+
+func TestTfheSub8(t *testing.T) {
+	TfheSub(t, FheUint8)
+}
+
+func TestTfheMul8(t *testing.T) {
+	TfheMul(t, FheUint8)
+}
+
+func TestTfheLte8(t *testing.T) {
+	TfheLte(t, FheUint8)
+}
+
+func TestTfheLt8(t *testing.T) {
+	TfheLte(t, FheUint8)
+}
+func TestTfheAdd16(t *testing.T) {
+	TfheAdd(t, FheUint16)
+}
+
+func TestTfheSub16(t *testing.T) {
+	TfheSub(t, FheUint16)
+}
+
+func TestTfheMul16(t *testing.T) {
+	TfheMul(t, FheUint16)
+}
+
+func TestTfheLte16(t *testing.T) {
+	TfheLte(t, FheUint16)
+}
+
+func TestTfheLt16(t *testing.T) {
+	TfheLte(t, FheUint16)
+}
+
+func TestTfheAdd32(t *testing.T) {
+	TfheAdd(t, FheUint32)
+}
+
+func TestTfheSub32(t *testing.T) {
+	TfheSub(t, FheUint32)
+}
+
+func TestTfheMul32(t *testing.T) {
+	TfheMul(t, FheUint32)
+}
+
+func TestTfheLte32(t *testing.T) {
+	TfheLte(t, FheUint32)
+}
+
+func TestTfheLt32(t *testing.T) {
+	TfheLte(t, FheUint32)
 }
 
 // func TestTfheTrivialEncryptDecrypt(t *testing.T) {

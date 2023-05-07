@@ -550,6 +550,7 @@ func (ct *tfheCiphertext) encrypt(value uint64, t fheUintType) {
 	case FheUint32:
 		ct.setPtr(C.client_key_encrypt_fhe_uint32(cks, C.uint(value)))
 	}
+	ct.fheUintType = t
 	ct.value = &value
 }
 
