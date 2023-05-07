@@ -505,7 +505,6 @@ func FheSub(t *testing.T, fheUintType fheUintType) {
 		rhs = 133337
 	}
 	expected := lhs - rhs
-	println(expected)
 	c := &fheSub{}
 	depth := 1
 	state := newTestState()
