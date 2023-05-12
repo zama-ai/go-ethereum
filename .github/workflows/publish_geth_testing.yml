@@ -1,30 +1,22 @@
-name: Publish go-ethereum tests container
+name: Run go-ethereum unit tests
 
 on:
   workflow_dispatch:
     inputs:
       tfhe_rs_ref:
-        description: 'Branch, tag or commit SHA1 to checkout TFHE-rs'
+        description: "Branch, tag or commit SHA1 to checkout TFHE-rs"
         required: true
         default: "main"
         type: string
-      go_ethereum_ref:
-        description: 'Branch, tag or commit SHA1 to checkout go-ethereum'
+      tfhe_cli_ref:
+        description: "Branch, tag or commit SHA1 to checkout TFHE-cli"
         required: true
         default: "main"
         type: string
-      tfhe_rs_c_api_tag:
-        description: 'TFHE-rs C API tag (default: latest)'
-        default: "latest"
-        type: string
-        required: false
-
-env:
-  DOCKER_IMAGE: ghcr.io/zama-ai/geth-tests
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to GitHub Container Registry
+  build_and_test:
+    name: Build and test go-ethereum
     runs-on: ubuntu-latest
     steps:
       - name: Check out tfhe-rs
@@ -34,25 +26,37 @@ jobs:
           ref: ${{ inputs.tfhe_rs_ref }}
           path: tfhe-rs
 
+      - name: Check out tfhe-cli
+        uses: actions/checkout@v3
+        with:
+          repository: tremblaythibaultl/tfhe-cli
+          ref: ${{ inputs.tfhe_cli_ref }}
+          path: tfhe-cli
+
       - name: Check out go-ethereum
         uses: actions/checkout@v3
         with:
-          ref: ${{ inputs.go_ethereum_ref }}
           path: go-ethereum
-      
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Build and push Docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          file: go-ethereum/docker/Dockerfile
-          push: true
-          pull: true
-          tags: ${{ env.DOCKER_IMAGE }}:${{ inputs.tfhe_rs_c_api_tag }},${{ env.DOCKER_IMAGE }}:latest
-          labels: geth-tests
-          
+
+      - name: Build C API
+        working-directory: ./tfhe-rs
+        run: make build_c_api
+
+      - name: Move library files
+        run: |
+          mv ./tfhe-rs/target/release/tfhe.h ./go-ethereum/core/vm/
+          sudo mv ./tfhe-rs/target/release/libtfhe.* /usr/lib/
+
+      - name: Generate TFHE-rs keys
+        working-directory: ./tfhe-cli
+        run: cargo run --release keygen bin .
+
+      - name: Move keys
+        run: |
+          mkdir -p $HOME/.evmosd/zama/keys/network-fhe-keys
+          mv ./tfhe-cli/client_key.bin $HOME/.evmosd/zama/keys/network-fhe-keys/cks
+          mv ./tfhe-cli/server_key.bin $HOME/.evmosd/zama/keys/network-fhe-keys/sks
+
+      - name: Run tests
+        working-directory: ./go-ethereum/core/vm
+        run: go test -v
