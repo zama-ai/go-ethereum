@@ -1,18 +1,10 @@
 name: Run go-ethereum unit tests
 
 on:
-  workflow_dispatch:
-    inputs:
-      tfhe_rs_ref:
-        description: "Branch, tag or commit SHA1 to checkout TFHE-rs"
-        required: true
-        default: "main"
-        type: string
-      tfhe_cli_ref:
-        description: "Branch, tag or commit SHA1 to checkout TFHE-cli"
-        required: true
-        default: "main"
-        type: string
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build_and_test:
@@ -23,14 +15,14 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: zama-ai/tfhe-rs
-          ref: ${{ inputs.tfhe_rs_ref }}
+          ref: 0.2.1
           path: tfhe-rs
 
       - name: Check out tfhe-cli
         uses: actions/checkout@v3
         with:
           repository: tremblaythibaultl/tfhe-cli
-          ref: ${{ inputs.tfhe_cli_ref }}
+          ref: main
           path: tfhe-cli
 
       - name: Check out go-ethereum
