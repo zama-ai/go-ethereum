@@ -2,9 +2,9 @@ name: Run go-ethereum unit tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "1.10.19-zama" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "1.10.19-zama" ]
 
 jobs:
   build_and_test:
