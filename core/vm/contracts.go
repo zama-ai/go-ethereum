@@ -1172,6 +1172,7 @@ var requireHttpClient http.Client = http.Client{}
 
 var publicSignatureKey []byte
 var privateSignatureKey []byte
+var privateEncryptionKey []byte
 
 func requireBytesToSign(ciphertext []byte, value bool) []byte {
 	// TODO: avoid copy
@@ -1205,17 +1206,27 @@ func init() {
 
 	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
 	case "oracle":
-		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
+		ed25519PrivateKey, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
+			println("WARNING: error reading Ed25519 private key file")
 			return
 		}
-		privateSignatureKey = priv
+		privateSignatureKey = ed25519PrivateKey
+
+		naclPrivateKey, err := os.ReadFile(home + "/.evmosd/zama/keys/encryption-keys/private.nacl")
+		if err != nil {
+			println("WARNING: error reading NaCl private key file")
+			return
+		}
+		privateEncryptionKey = naclPrivateKey
+
 	case "node":
-		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
+		ed25519PublicKey, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
 		if err != nil {
+			println("WARNING: error reading Ed25519 public key file")
 			return
 		}
-		publicSignatureKey = pub
+		publicSignatureKey = ed25519PublicKey
 	default:
 		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
 	}
@@ -1370,20 +1381,14 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func classicalPublicKeyEncrypt(value uint64, pubKey []byte) []byte {
-	// TODO: replace this by a constant keypair so that the wallet can hold the constant public key
-	ephemeralPublicKey, ephemeralPrivateKey, err := box.GenerateKey(rand.Reader)
-	if err != nil {
-		panic(err)
-	}
-
+func classicalPublicKeyEncrypt(value uint64, userPublicKey []byte) []byte {
 	var nonce [24]byte
 	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 		panic(err)
 	}
-	val_bytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(val_bytes, uint32(value))
-	encrypted := box.Seal(nonce[:], val_bytes, &nonce, ephemeralPublicKey, ephemeralPrivateKey)
+	valBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(valBytes, uint32(value))
+	encrypted := box.Seal(nonce[:], valBytes, &nonce, (*[32]byte)(userPublicKey), (*[32]byte)(privateEncryptionKey))
 	return encrypted
 }
 
