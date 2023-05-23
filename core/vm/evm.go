@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -86,6 +87,35 @@ type TxContext struct {
 	GasPrice *big.Int       // Provides information for GASPRICE
 }
 
+// A Logger interface for the EVM.
+type Logger interface {
+	Debug(msg string, keyvals ...interface{})
+	Info(msg string, keyvals ...interface{})
+	Error(msg string, keyvals ...interface{})
+}
+
+// A default Logger implementation that logs to stdout.
+type defaultLogger struct{}
+
+func toString(keyvals ...interface{}) (ret string) {
+	for _, element := range keyvals {
+		ret += fmt.Sprintf("%v", element) + " "
+	}
+	return
+}
+
+func (*defaultLogger) Debug(msg string, keyvals ...interface{}) {
+	fmt.Println("Debug: "+msg, toString(keyvals...))
+}
+
+func (*defaultLogger) Info(msg string, keyvals ...interface{}) {
+	fmt.Println("Info: "+msg, toString(keyvals...))
+}
+
+func (*defaultLogger) Error(msg string, keyvals ...interface{}) {
+	fmt.Println("Error: "+msg, toString(keyvals...))
+}
+
 // EVM is the Ethereum Virtual Machine base object and provides
 // the necessary tools to run a contract on the given state with
 // the provided context. It should be noted that any error
@@ -126,6 +156,9 @@ type EVM struct {
 	EthCall bool
 	/// A flag to indicate that execution results will be committed.
 	Commit bool
+
+	// The logger allows the EVM to report information during execution.
+	Logger Logger
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -138,6 +171,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		Config:      config,
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
+		Logger:      &defaultLogger{},
 	}
 	evm.interpreter = NewEVMInterpreter(evm, config)
 	return evm
