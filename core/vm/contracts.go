@@ -1205,19 +1205,17 @@ func init() {
 
 	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
 	case "oracle":
-		ed25519PrivateKey, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
+		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
-			println("WARNING: error reading Ed25519 private key file")
 			return
 		}
-		privateSignatureKey = ed25519PrivateKey
+		privateSignatureKey = priv
 	case "node":
-		ed25519PublicKey, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
+		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
 		if err != nil {
-			println("WARNING: error reading Ed25519 public key file")
 			return
 		}
-		publicSignatureKey = ed25519PublicKey
+		publicSignatureKey = pub
 	default:
 		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
 	}
