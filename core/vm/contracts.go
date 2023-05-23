@@ -1168,6 +1168,28 @@ func generateEd25519Keys() error {
 	return nil
 }
 
+//lint:ignore U1000 Want to keep to show how NaCl keys were generated.
+func generateNaClKeys() error {
+	senderPublicKey, senderPrivateKey, err := box.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	home := homeDir()
+
+	err = os.WriteFile(home+"/.evmosd/zama/keys/encryption-keys/public.nacl", senderPublicKey[:], 0644)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(home+"/.evmosd/zama/keys/encryption-keys/private.nacl", senderPrivateKey[:], 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 var requireHttpClient http.Client = http.Client{}
 
 var publicSignatureKey []byte
