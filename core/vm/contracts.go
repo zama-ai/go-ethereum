@@ -19,6 +19,7 @@ package vm
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -40,6 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/naoina/toml"
+	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -1368,16 +1370,28 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func fheEncryptToUserKey(value uint64, userAddress common.Address, t fheUintType) ([]byte, error) {
-	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
-	pks, err := os.ReadFile(userPublicKey)
+func classicalPublicKeyEncrypt(value uint64, pubKey []byte) []byte {
+	// TODO: replace this by a constant keypair so that the wallet can hold the constant public key
+	ephemeralPublicKey, ephemeralPrivateKey, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	ct := publicKeyEncrypt(pks, value, t)
+
+	var nonce [24]byte
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		panic(err)
+	}
+	val_bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(val_bytes, uint32(value))
+	encrypted := box.Seal(nonce[:], val_bytes, &nonce, ephemeralPublicKey, ephemeralPrivateKey)
+	return encrypted
+}
+
+func fheEncryptToUserKey(value uint64, pubKey []byte) ([]byte, error) {
+	ct := classicalPublicKeyEncrypt(value, pubKey)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
+	err := os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -1452,13 +1466,14 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	if !accessibleState.Interpreter().evm.EthCall {
 		return nil, errors.New("reencrypt not supported in write commands")
 	}
-	if len(input) != 32 {
-		return nil, errors.New("invalid ciphertext handle")
+	if len(input) != 64 {
+		return nil, errors.New("invalid ciphertext handle, public key pair")
 	}
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct != nil {
 		decryptedValue := ct.ciphertext.decrypt()
-		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin, ct.ciphertext.fheUintType)
+		pubKey := input[32:64]
+		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, pubKey)
 		if err != nil {
 			return nil, err
 		}
