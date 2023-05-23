@@ -1394,21 +1394,24 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func classicalPublicKeyEncrypt(value uint64, userPublicKey []byte) []byte {
+func classicalPublicKeyEncrypt(value uint64, userPublicKey []byte) ([]byte, error) {
 	valBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(valBytes, uint32(value))
 	encrypted, err := box.SealAnonymous(nil, valBytes, (*[32]byte)(userPublicKey), rand.Reader)
 	if err != nil {
-		fmt.Printf("unexpected error sealing %v", err)
+		return nil, err
 	}
-	return encrypted
+	return encrypted, nil
 }
 
 func fheEncryptToUserKey(value uint64, pubKey []byte) ([]byte, error) {
-	ct := classicalPublicKeyEncrypt(value, pubKey)
+	ct, err := classicalPublicKeyEncrypt(value, pubKey)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: for testing
-	err := os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
+	err = os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
 	if err != nil {
 		return nil, err
 	}
