@@ -1194,7 +1194,6 @@ var requireHttpClient http.Client = http.Client{}
 
 var publicSignatureKey []byte
 var privateSignatureKey []byte
-var privateEncryptionKey []byte
 
 func requireBytesToSign(ciphertext []byte, value bool) []byte {
 	// TODO: avoid copy
@@ -1234,14 +1233,6 @@ func init() {
 			return
 		}
 		privateSignatureKey = ed25519PrivateKey
-
-		naclPrivateKey, err := os.ReadFile(home + "/.evmosd/zama/keys/encryption-keys/private.nacl")
-		if err != nil {
-			println("WARNING: error reading NaCl private key file")
-			return
-		}
-		privateEncryptionKey = naclPrivateKey
-
 	case "node":
 		ed25519PublicKey, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
 		if err != nil {
@@ -1404,13 +1395,12 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 }
 
 func classicalPublicKeyEncrypt(value uint64, userPublicKey []byte) []byte {
-	var nonce [24]byte
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		panic(err)
-	}
 	valBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(valBytes, uint32(value))
-	encrypted := box.Seal(nonce[:], valBytes, &nonce, (*[32]byte)(userPublicKey), (*[32]byte)(privateEncryptionKey))
+	encrypted, err := box.SealAnonymous(nil, valBytes, (*[32]byte)(userPublicKey), rand.Reader)
+	if err != nil {
+		fmt.Printf("unexpected error sealing %v", err)
+	}
 	return encrypted
 }
 
