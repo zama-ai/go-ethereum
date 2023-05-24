@@ -19,6 +19,7 @@ package vm
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -40,6 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/naoina/toml"
+	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -1384,13 +1386,19 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func fheEncryptToUserKey(value uint64, userAddress common.Address, t fheUintType) ([]byte, error) {
-	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
-	pks, err := os.ReadFile(userPublicKey)
+func classicalPublicKeyEncrypt(value *big.Int, userPublicKey []byte) ([]byte, error) {
+	encrypted, err := box.SealAnonymous(nil, value.Bytes(), (*[32]byte)(userPublicKey), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
-	ct := publicKeyEncrypt(pks, value, t)
+	return encrypted, nil
+}
+
+func encryptToUserKey(value *big.Int, pubKey []byte) ([]byte, error) {
+	ct, err := classicalPublicKeyEncrypt(value, pubKey)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: for testing
 	err = os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
@@ -1479,15 +1487,16 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		accessibleState.Interpreter().evm.Logger.Error(msg)
 		return nil, errors.New(msg)
 	}
-	if len(input) != 32 {
-		msg := "reencrypt input len must be 32 bytes"
+	if len(input) != 64 {
+    msg := "reencrypt input len must be 64 bytes)"
 		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct != nil {
 		decryptedValue := ct.ciphertext.decrypt()
-		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, accessibleState.Interpreter().evm.Origin, ct.ciphertext.fheUintType)
+		pubKey := input[32:64]
+		reencryptedValue, err := encryptToUserKey(&decryptedValue, pubKey)
 		if err != nil {
 			accessibleState.Interpreter().evm.Logger.Error("reencrypt failed to encrypt to user key", "err", err)
 			return nil, err
@@ -1534,7 +1543,8 @@ func requireURL(key *string) string {
 // Returns the require value.
 func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
 	ciphertext := ct.serialize()
-	value := (ct.decrypt() != 0)
+	plaintext := ct.decrypt()
+	value := (plaintext.BitLen() != 0)
 	key := requireKey(ciphertext)
 	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
 	if err != nil {

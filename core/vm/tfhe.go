@@ -410,8 +410,10 @@ import "C"
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -509,7 +511,7 @@ type tfheCiphertext struct {
 	ptr           unsafe.Pointer
 	serialization []byte
 	hash          []byte
-	value         *uint64
+	value         *big.Int
 	random        bool
 	fheUintType   fheUintType
 }
@@ -536,17 +538,26 @@ func (ct *tfheCiphertext) deserialize(in []byte, t fheUintType) error {
 	return nil
 }
 
-func (ct *tfheCiphertext) encrypt(value uint64, t fheUintType) {
+func (ct *tfheCiphertext) encrypt(value big.Int, t fheUintType) {
 	if ct.initialized() {
 		panic("cannot encrypt to an existing ciphertext")
 	}
+
 	switch t {
 	case FheUint8:
-		ct.setPtr(C.client_key_encrypt_fhe_uint8(cks, C.uchar(value)))
+		valBytes := [1]byte{}
+		value.FillBytes(valBytes[:])
+		ct.setPtr(C.client_key_encrypt_fhe_uint8(cks, C.uchar(valBytes[len(valBytes)-1])))
 	case FheUint16:
-		ct.setPtr(C.client_key_encrypt_fhe_uint16(cks, C.ushort(value)))
+		valBytes := [2]byte{}
+		value.FillBytes(valBytes[:])
+		var valInt uint16 = binary.BigEndian.Uint16(valBytes[:])
+		ct.setPtr(C.client_key_encrypt_fhe_uint16(cks, C.ushort(valInt)))
 	case FheUint32:
-		ct.setPtr(C.client_key_encrypt_fhe_uint32(cks, C.uint(value)))
+		valBytes := [4]byte{}
+		value.FillBytes(valBytes[:])
+		var valInt uint32 = binary.BigEndian.Uint32(valBytes[:])
+		ct.setPtr(C.client_key_encrypt_fhe_uint32(cks, C.uint(valInt)))
 	}
 	ct.fheUintType = t
 	ct.value = &value
@@ -700,7 +711,7 @@ func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	return res, nil
 }
 
-func (ct *tfheCiphertext) decrypt() uint64 {
+func (ct *tfheCiphertext) decrypt() big.Int {
 	if !ct.availableForOps() {
 		panic("cannot decrypt a null ciphertext")
 	} else if ct.value != nil {
@@ -715,8 +726,8 @@ func (ct *tfheCiphertext) decrypt() uint64 {
 	case FheUint32:
 		value = uint64(C.decrypt_fhe_uint32(cks, ct.ptr))
 	}
-	ct.value = &value
-	return value
+	ct.value = new(big.Int).SetUint64(value)
+	return *ct.value
 }
 
 func (ct *tfheCiphertext) setPtr(ptr unsafe.Pointer) {

@@ -436,7 +436,7 @@ func newTestState() *statefulPrecompileAccessibleState {
 
 func verifyCiphertextInTestMemory(interpreter *EVMInterpreter, value uint64, depth int, t fheUintType) *tfheCiphertext {
 	ct := new(tfheCiphertext)
-	ct.encrypt(value, t)
+	ct.encrypt(*new(big.Int).SetUint64(value), t)
 	return verifyTfheCiphertextInTestMemory(interpreter, ct, depth)
 }
 
@@ -486,7 +486,7 @@ func FheAdd(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted := res.ciphertext.decrypt()
-	if decrypted != uint64(expected) {
+	if decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result")
 	}
 }
@@ -524,7 +524,7 @@ func FheSub(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted := res.ciphertext.decrypt()
-	if decrypted != expected {
+	if decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result")
 	}
 }
@@ -562,7 +562,7 @@ func FheMul(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted := res.ciphertext.decrypt()
-	if decrypted != expected {
+	if decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result")
 	}
 }
@@ -601,7 +601,7 @@ func FheLte(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
+	if decrypted.Uint64() != 0 {
 		t.Fatalf("invalid decrypted result")
 	}
 
@@ -616,7 +616,7 @@ func FheLte(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
+	if decrypted.Uint64() != 1 {
 		t.Fatalf("invalid decrypted result")
 	}
 }
@@ -656,7 +656,7 @@ func FheLt(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted := res.ciphertext.decrypt()
-	if decrypted != 0 {
+	if decrypted.Uint64() != 0 {
 		t.Fatalf("invalid decrypted result")
 	}
 
@@ -671,7 +671,7 @@ func FheLt(t *testing.T, fheUintType fheUintType) {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
 	decrypted = res.ciphertext.decrypt()
-	if decrypted != 1 {
+	if decrypted.Uint64() != 1 {
 		t.Fatalf("invalid decrypted result")
 	}
 }
