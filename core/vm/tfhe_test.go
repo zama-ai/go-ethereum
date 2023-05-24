@@ -18,6 +18,7 @@ package vm
 
 import (
 	"bytes"
+	"math/big"
 	"testing"
 )
 
@@ -25,20 +26,20 @@ import (
 // generate keys on demand in the test.
 
 func TfheCksEncryptDecrypt(t *testing.T, fheUintType fheUintType) {
-	var val uint64
+	var val big.Int
 	switch fheUintType {
 	case FheUint8:
-		val = 2
+		val.SetUint64(2)
 	case FheUint16:
-		val = 1337
+		val.SetUint64(1337)
 	case FheUint32:
-		val = 1333337
+		val.SetUint64(1333337)
 	}
 	ct := new(tfheCiphertext)
 	ct.encrypt(val, fheUintType)
 	res := ct.decrypt()
-	if res != val {
-		t.Fatalf("%d != %d", val, res)
+	if res.Uint64() != val.Uint64() {
+		t.Fatalf("%d != %d", val.Uint64(), res.Uint64())
 	}
 }
 
@@ -73,92 +74,92 @@ func TfheDeserializeFailure(t *testing.T, fheUintType fheUintType) {
 }
 
 func TfheAdd(t *testing.T, fheUintType fheUintType) {
-	var a, b uint64
+	var a, b big.Int
 	switch fheUintType {
 	case FheUint8:
-		a = 2
-		b = 1
+		a.SetUint64(2)
+		b.SetUint64(1)
 	case FheUint16:
-		a = 4283
-		b = 1337
+		a.SetUint64(4283)
+		b.SetUint64(1337)
 	case FheUint32:
-		a = 1333337
-		b = 133337
+		a.SetUint64(1333337)
+		b.SetUint64(133337)
 	}
-	expected := a + b
+	expected := new(big.Int).Add(&a, &b)
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, fheUintType)
 	ctRes, _ := ctA.add(ctB)
 	res := ctRes.decrypt()
-	if res != expected {
-		t.Fatalf("%d != %d", expected, res)
+	if res.Uint64() != expected.Uint64() {
+		t.Fatalf("%d != %d", expected.Uint64(), res.Uint64())
 	}
 }
 
 func TfheSub(t *testing.T, fheUintType fheUintType) {
-	var a, b uint64
+	var a, b big.Int
 	switch fheUintType {
 	case FheUint8:
-		a = 2
-		b = 1
+		a.SetUint64(2)
+		b.SetUint64(1)
 	case FheUint16:
-		a = 4283
-		b = 1337
+		a.SetUint64(4283)
+		b.SetUint64(1337)
 	case FheUint32:
-		a = 1333337
-		b = 133337
+		a.SetUint64(1333337)
+		b.SetUint64(133337)
 	}
-	expected := a - b
+	expected := new(big.Int).Sub(&a, &b)
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, fheUintType)
 	ctRes, _ := ctA.sub(ctB)
 	res := ctRes.decrypt()
-	if res != expected {
-		t.Fatalf("%d != %d", expected, res)
+	if res.Uint64() != expected.Uint64() {
+		t.Fatalf("%d != %d", expected.Uint64(), res.Uint64())
 	}
 }
 
 func TfheMul(t *testing.T, fheUintType fheUintType) {
-	var a, b uint64
+	var a, b big.Int
 	switch fheUintType {
 	case FheUint8:
-		a = 2
-		b = 1
+		a.SetUint64(2)
+		b.SetUint64(1)
 	case FheUint16:
-		a = 169
-		b = 5
+		a.SetUint64(169)
+		b.SetUint64(5)
 	case FheUint32:
-		a = 137
-		b = 17
+		a.SetUint64(137)
+		b.SetInt64(17)
 	}
-	expected := a * b
+	expected := new(big.Int).Mul(&a, &b)
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
 	ctB.encrypt(b, fheUintType)
 	ctRes, _ := ctA.mul(ctB)
 	res := ctRes.decrypt()
-	if res != expected {
-		t.Fatalf("%d != %d", expected, res)
+	if res.Uint64() != expected.Uint64() {
+		t.Fatalf("%d != %d", expected.Uint64(), res.Uint64())
 	}
 }
 
 func TfheLte(t *testing.T, fheUintType fheUintType) {
-	var a, b uint64
+	var a, b big.Int
 	switch fheUintType {
 	case FheUint8:
-		a = 2
-		b = 1
+		a.SetUint64(2)
+		b.SetUint64(1)
 	case FheUint16:
-		a = 4283
-		b = 1337
+		a.SetUint64(4283)
+		b.SetUint64(1337)
 	case FheUint32:
-		a = 1333337
-		b = 133337
+		a.SetUint64(1333337)
+		b.SetUint64(133337)
 	}
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, fheUintType)
@@ -168,25 +169,25 @@ func TfheLte(t *testing.T, fheUintType fheUintType) {
 	ctRes2, _ := ctB.lte(ctA)
 	res1 := ctRes1.decrypt()
 	res2 := ctRes2.decrypt()
-	if res1 != 0 {
-		t.Fatalf("%d != %d", 0, res1)
+	if res1.Uint64() != 0 {
+		t.Fatalf("%d != %d", 0, res1.Uint64())
 	}
-	if res2 != 1 {
-		t.Fatalf("%d != %d", 0, res2)
+	if res2.Uint64() != 1 {
+		t.Fatalf("%d != %d", 0, res2.Uint64())
 	}
 }
 func TfheLt(t *testing.T, fheUintType fheUintType) {
-	var a, b uint64
+	var a, b big.Int
 	switch fheUintType {
 	case FheUint8:
-		a = 2
-		b = 1
+		a.SetUint64(2)
+		b.SetUint64(1)
 	case FheUint16:
-		a = 4283
-		b = 1337
+		a.SetUint64(4283)
+		b.SetUint64(1337)
 	case FheUint32:
-		a = 1333337
-		b = 133337
+		a.SetUint64(1333337)
+		b.SetUint64(133337)
 	}
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, FheUint8)
@@ -196,11 +197,11 @@ func TfheLt(t *testing.T, fheUintType fheUintType) {
 	ctRes2, _ := ctB.lte(ctA)
 	res1 := ctRes1.decrypt()
 	res2 := ctRes2.decrypt()
-	if res1 != 0 {
-		t.Fatalf("%d != %d", 0, res1)
+	if res1.Uint64() != 0 {
+		t.Fatalf("%d != %d", 0, res1.Uint64())
 	}
-	if res2 != 1 {
-		t.Fatalf("%d != %d", 0, res2)
+	if res2.Uint64() != 1 {
+		t.Fatalf("%d != %d", 0, res2.Uint64())
 	}
 }
 

@@ -1370,17 +1370,15 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	return ctHash[:], nil
 }
 
-func classicalPublicKeyEncrypt(value uint64, userPublicKey []byte) ([]byte, error) {
-	valBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(valBytes, uint32(value))
-	encrypted, err := box.SealAnonymous(nil, valBytes, (*[32]byte)(userPublicKey), rand.Reader)
+func classicalPublicKeyEncrypt(value *big.Int, userPublicKey []byte) ([]byte, error) {
+	encrypted, err := box.SealAnonymous(nil, value.Bytes(), (*[32]byte)(userPublicKey), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 	return encrypted, nil
 }
 
-func fheEncryptToUserKey(value uint64, pubKey []byte) ([]byte, error) {
+func encryptToUserKey(value *big.Int, pubKey []byte) ([]byte, error) {
 	ct, err := classicalPublicKeyEncrypt(value, pubKey)
 	if err != nil {
 		return nil, err
@@ -1469,7 +1467,7 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	if ct != nil {
 		decryptedValue := ct.ciphertext.decrypt()
 		pubKey := input[32:64]
-		reencryptedValue, err := fheEncryptToUserKey(decryptedValue, pubKey)
+		reencryptedValue, err := encryptToUserKey(&decryptedValue, pubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1509,7 +1507,8 @@ func requireURL(key *string) string {
 // Returns the require value.
 func putRequire(ct *tfheCiphertext) bool {
 	ciphertext := ct.serialize()
-	value := (ct.decrypt() != 0)
+	plaintext := ct.decrypt()
+	value := (plaintext.BitLen() != 0)
 	key := requireKey(ciphertext)
 	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
 	if err != nil {
