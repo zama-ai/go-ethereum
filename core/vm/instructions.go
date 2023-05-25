@@ -614,39 +614,54 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		interpreter.evm.Logger.Info("SSTORE CT NOT VERIFIED", "val", hex.EncodeToString(val.Bytes()))
 		return
 	}
+	interpreter.evm.Logger.Info("SSTORE CT VERIFIED", "val", hex.EncodeToString(val.Bytes()),
+		"type", verifiedCiphertext.ciphertext.fheUintType,
+		"depths", verifiedCiphertext.verifiedDepths.m,
+		"ctHash", hex.EncodeToString(verifiedCiphertext.ciphertext.getHash().Bytes()))
 	// Try to read ciphertext metadata from protected storage.
-	// metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
-	// metadata := ciphertextMetadata{}
-	// if metadataInt.IsZero() {
-	// 	// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
-	// 	metadata.refCount = 1
-	// 	metadata.length = uint64(fheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
-	// 	metadata.fheUintType = verifiedCiphertext.ciphertext.fheUintType
-	// 	ciphertextSlot := newInt(val.Bytes())
-	// 	ciphertextSlot.AddUint64(ciphertextSlot, 1)
-	// 	ctPart32 := make([]byte, 32)
-	// 	partIdx := 0
-	// 	ctBytes := verifiedCiphertext.ciphertext.serialize()
-	// 	for i, b := range ctBytes {
-	// 		if i%32 == 0 && i != 0 {
-	// 			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
-	// 			ciphertextSlot.AddUint64(ciphertextSlot, 1)
-	// 			ctPart32 = make([]byte, 32)
-	// 			partIdx = 0
-	// 		}
-	// 		ctPart32[partIdx] = b
-	// 		partIdx++
-	// 	}
-	// 	if len(ctPart32) != 0 {
-	// 		interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
-	// 	}
-	// } else {
-	// 	// If metadata exists, bump the refcount by 1.
-	// 	metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
-	// 	metadata.refCount++
-	// }
-	// // Save the metadata in protected storage.
-	// interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
+	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
+	metadata := ciphertextMetadata{}
+	if metadataInt.IsZero() {
+		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
+		metadata.refCount = 1
+		metadata.length = uint64(fheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
+		metadata.fheUintType = verifiedCiphertext.ciphertext.fheUintType
+		ciphertextSlot := newInt(val.Bytes())
+		ciphertextSlot.AddUint64(ciphertextSlot, 1)
+		ctPart32 := make([]byte, 32)
+		partIdx := 0
+		ctBytes := verifiedCiphertext.ciphertext.serialize()
+		interpreter.evm.Logger.Info("SSTORE CIPHERTEXT", "refCount", metadata.refCount, "len", metadata.length, "type",
+			metadata.fheUintType, "ctSlot", hex.EncodeToString(ciphertextSlot.Bytes()), "ctBytes", ctBytes[0:256], "ctBytesLen", len(ctBytes))
+		for i, b := range ctBytes {
+			if i%32 == 0 && i != 0 {
+				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
+				ciphertextSlot.AddUint64(ciphertextSlot, 1)
+				ctPart32 = make([]byte, 32)
+				partIdx = 0
+			}
+			ctPart32[partIdx] = b
+			partIdx++
+		}
+		if len(ctPart32) != 0 {
+			interpreter.evm.Logger.Info("SSTORE LEN CTPART32 != 0", "len", len(ctPart32))
+			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
+		} else {
+			interpreter.evm.Logger.Info("SSTORE LEN CTPART32 == 0", "len", len(ctPart32))
+		}
+	} else {
+		interpreter.evm.Logger.Info("SSTORE METADATA NOT 0")
+		// If metadata exists, bump the refcount by 1.
+		metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
+		metadata.refCount++
+	}
+	// Save the metadata in protected storage.
+	ms := metadata.serialize()
+	interpreter.evm.Logger.Info("SSTORE METADATA",
+		"protectedStorage", hex.EncodeToString(protectedStorage.Bytes()),
+		"val", val.Bytes(),
+		"metadata", hex.EncodeToString(ms[:]))
+	interpreter.evm.StateDB.SetState(protectedStorage, val, ms)
 }
 
 // If references are still left, reduce refCount by 1. Otherwise, zero out the metadata and the ciphertext slots.
