@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"encoding/hex"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -610,49 +611,53 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
 	verifiedCiphertext := getVerifiedCiphertextFromEVM(interpreter, val)
 	if verifiedCiphertext == nil {
+		interpreter.evm.Logger.Info("SSTORE CT NOT VERIFIED", "val", hex.EncodeToString(val.Bytes()))
 		return
 	}
 	// Try to read ciphertext metadata from protected storage.
-	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
-	metadata := ciphertextMetadata{}
-	if metadataInt.IsZero() {
-		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
-		metadata.refCount = 1
-		metadata.length = uint64(fheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
-		metadata.fheUintType = verifiedCiphertext.ciphertext.fheUintType
-		ciphertextSlot := newInt(val.Bytes())
-		ciphertextSlot.AddUint64(ciphertextSlot, 1)
-		ctPart32 := make([]byte, 32)
-		partIdx := 0
-		ctBytes := verifiedCiphertext.ciphertext.serialize()
-		for i, b := range ctBytes {
-			if i%32 == 0 && i != 0 {
-				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
-				ciphertextSlot.AddUint64(ciphertextSlot, 1)
-				ctPart32 = make([]byte, 32)
-				partIdx = 0
-			}
-			ctPart32[partIdx] = b
-			partIdx++
-		}
-		if len(ctPart32) != 0 {
-			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
-		}
-	} else {
-		// If metadata exists, bump the refcount by 1.
-		metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
-		metadata.refCount++
-	}
-	// Save the metadata in protected storage.
-	interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
+	// metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
+	// metadata := ciphertextMetadata{}
+	// if metadataInt.IsZero() {
+	// 	// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
+	// 	metadata.refCount = 1
+	// 	metadata.length = uint64(fheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
+	// 	metadata.fheUintType = verifiedCiphertext.ciphertext.fheUintType
+	// 	ciphertextSlot := newInt(val.Bytes())
+	// 	ciphertextSlot.AddUint64(ciphertextSlot, 1)
+	// 	ctPart32 := make([]byte, 32)
+	// 	partIdx := 0
+	// 	ctBytes := verifiedCiphertext.ciphertext.serialize()
+	// 	for i, b := range ctBytes {
+	// 		if i%32 == 0 && i != 0 {
+	// 			interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
+	// 			ciphertextSlot.AddUint64(ciphertextSlot, 1)
+	// 			ctPart32 = make([]byte, 32)
+	// 			partIdx = 0
+	// 		}
+	// 		ctPart32[partIdx] = b
+	// 		partIdx++
+	// 	}
+	// 	if len(ctPart32) != 0 {
+	// 		interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
+	// 	}
+	// } else {
+	// 	// If metadata exists, bump the refcount by 1.
+	// 	metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
+	// 	metadata.refCount++
+	// }
+	// // Save the metadata in protected storage.
+	// interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
 }
 
 // If references are still left, reduce refCount by 1. Otherwise, zero out the metadata and the ciphertext slots.
 func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
 	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, metadataKey)
+	interpreter.evm.Logger.Info("SSTORE GARBAGE COLLECT", "existingHash", hex.EncodeToString(existingMetadataHash[:]))
 	existingMetadataInt := newInt(existingMetadataHash.Bytes())
 	if !existingMetadataInt.IsZero() {
+		interpreter.evm.Logger.Info("SSTORE GARBAGE COLLECT NOT ZERO")
 		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
+		interpreter.evm.Logger.Info("SSTORE GARBAGE COLLECT METADATA", "refCount", metadata.refCount, "type", metadata.fheUintType, "len", metadata.length)
 		if metadata.refCount == 1 {
 			// Zero the metadata key-value.
 			interpreter.evm.StateDB.SetState(protectedStorage, metadataKey, zero)
@@ -687,6 +692,14 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
+	if interpreter.evm.Commit {
+		interpreter.evm.Logger.Info("SSTORE",
+			"protected", hex.EncodeToString(protectedStorage[:]),
+			"loc", hex.EncodeToString(loc.Bytes()),
+			"newVal", hex.EncodeToString(newValBytes),
+			"oldVal", hex.EncodeToString(oldValHash[:]),
+		)
+	}
 	// Here, we assume that if the `Commit` flag is not set, no precompile would read/write an actual ciphertext
 	// from/to protected storage. Instead, all precompiles just insert random ciphertexts to memory.
 	// Therefore, if `Commit` is not set, we don't need to touch protected storage at all.
