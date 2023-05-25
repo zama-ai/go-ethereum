@@ -545,19 +545,11 @@ func (ct *tfheCiphertext) encrypt(value big.Int, t fheUintType) {
 
 	switch t {
 	case FheUint8:
-		valBytes := [1]byte{}
-		value.FillBytes(valBytes[:])
-		ct.setPtr(C.client_key_encrypt_fhe_uint8(cks, C.uchar(valBytes[len(valBytes)-1])))
+		ct.setPtr(C.client_key_encrypt_fhe_uint8(cks, C.uchar(value.Uint64())))
 	case FheUint16:
-		valBytes := [2]byte{}
-		value.FillBytes(valBytes[:])
-		var valInt uint16 = binary.BigEndian.Uint16(valBytes[:])
-		ct.setPtr(C.client_key_encrypt_fhe_uint16(cks, C.ushort(valInt)))
+		ct.setPtr(C.client_key_encrypt_fhe_uint16(cks, C.ushort(value.Uint64())))
 	case FheUint32:
-		valBytes := [4]byte{}
-		value.FillBytes(valBytes[:])
-		var valInt uint32 = binary.BigEndian.Uint32(valBytes[:])
-		ct.setPtr(C.client_key_encrypt_fhe_uint32(cks, C.uint(valInt)))
+		ct.setPtr(C.client_key_encrypt_fhe_uint32(cks, C.uint(value.Uint64())))
 	}
 	ct.fheUintType = t
 	ct.value = &value
