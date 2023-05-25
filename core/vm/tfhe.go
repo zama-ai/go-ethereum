@@ -461,6 +461,14 @@ func runGc() {
 }
 
 func init() {
+	fheCiphertextSize = make(map[fheUintType]uint)
+
+	fheCiphertextSize[FheUint8] = 28124
+	fheCiphertextSize[FheUint16] = 56236
+	fheCiphertextSize[FheUint32] = 112460
+
+	go runGc()
+	
 	home := homeDir()
 	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
 	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
@@ -483,14 +491,6 @@ func init() {
 	// ct := new(tfheCiphertext)
 	// ct.trivialEncrypt(1)
 	// fheCiphertextSize = len(ct.serialize())
-
-	fheCiphertextSize = make(map[fheUintType]uint)
-
-	fheCiphertextSize[FheUint8] = 28124
-	fheCiphertextSize[FheUint16] = 56236
-	fheCiphertextSize[FheUint32] = 112460
-
-	go runGc()
 }
 
 // Represents a TFHE ciphertext type (i.e., its bit capacity)
