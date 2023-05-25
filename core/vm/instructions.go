@@ -608,8 +608,8 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 // * if the ciphertext does not exist in protected storage, persist it with a refCount = 1
 // * if the ciphertexts exists in protected, bump its refCount by 1
 func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
-	verifiedCiphertext, isVerified := interpreter.verifiedCiphertexts[val]
-	if !isVerified {
+	verifiedCiphertext := getVerifiedCiphertextFromEVM(interpreter, val)
+	if verifiedCiphertext == nil {
 		return
 	}
 	// Try to read ciphertext metadata from protected storage.
@@ -687,7 +687,10 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
-	if newValHash != oldValHash {
+	// Here, we assume that if the `Commit` flag is not set, no precompile would read/write an actual ciphertext
+	// from/to protected storage. Instead, all precompiles just insert random ciphertexts to memory.
+	// Therefore, if `Commit` is not set, we don't need to touch protected storage at all.
+	if interpreter.evm.Commit && newValHash != oldValHash {
 		// Since the old value is no longer stored in actual contract storage, run garbage collection on protected storage.
 		garbageCollectProtectedStorage(oldValHash, protectedStorage, interpreter)
 		// If a verified ciphertext, persist to protected storage.

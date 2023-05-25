@@ -731,6 +731,7 @@ func TestProtectedStorageSstoreSload(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
 	interpreter := newTestInterpreter()
+	interpreter.evm.depth = 1
 	ct := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8)
 	ctHash := ct.getHash()
 	scope := newTestScopeConext()
@@ -769,6 +770,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
 	interpreter := newTestInterpreter()
+	interpreter.evm.depth = 1
 	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)
