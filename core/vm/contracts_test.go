@@ -424,6 +424,8 @@ func newTestInterpreter() *EVMInterpreter {
 	db := rawdb.NewMemoryDatabase()
 	state, _ := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	interpreter.evm.StateDB = state
+	interpreter.evm.Commit = true
+	interpreter.evm.Logger = &defaultLogger{}
 	return interpreter
 }
 
@@ -471,7 +473,6 @@ func FheAdd(t *testing.T, fheUintType fheUintType) {
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
 	addr := common.Address{}
 	readOnly := false
 	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
@@ -509,7 +510,6 @@ func FheSub(t *testing.T, fheUintType fheUintType) {
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
 	addr := common.Address{}
 	readOnly := false
 	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
@@ -547,7 +547,6 @@ func FheMul(t *testing.T, fheUintType fheUintType) {
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
 	addr := common.Address{}
 	readOnly := false
 	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
@@ -584,7 +583,6 @@ func FheLte(t *testing.T, fheUintType fheUintType) {
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
 	addr := common.Address{}
 	readOnly := false
 	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
@@ -639,7 +637,6 @@ func FheLt(t *testing.T, fheUintType fheUintType) {
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
-	state.interpreter.evm.Commit = true
 	addr := common.Address{}
 	readOnly := false
 	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
@@ -741,7 +738,6 @@ func TestFheLt32(t *testing.T) {
 // 	depth := 1
 // 	state := newTestState()
 // 	state.interpreter.evm.depth = depth
-// 	state.interpreter.evm.Commit = true
 // 	addr := common.Address{}
 // 	readOnly := false
 

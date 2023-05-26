@@ -241,8 +241,6 @@ func RunPrecompiledContract(p PrecompiledContract, accessibleState PrecompileAcc
 	if accessibleState.Interpreter().evm.Commit {
 		accessibleState.Interpreter().evm.Logger.Info("Calling precompiled contract", "callerAddr", caller, "precompile", addr)
 	}
-	accessibleState.Interpreter().evm.depth++
-	defer func() { accessibleState.Interpreter().evm.depth-- }()
 	gasCost := p.RequiredGas(accessibleState, input)
 	if suppliedGas < gasCost {
 		if accessibleState.Interpreter().evm.Commit {
@@ -1488,7 +1486,7 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		return nil, errors.New(msg)
 	}
 	if len(input) != 64 {
-    msg := "reencrypt input len must be 64 bytes)"
+		msg := "reencrypt input len must be 64 bytes"
 		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
