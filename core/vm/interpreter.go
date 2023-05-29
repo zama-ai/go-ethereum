@@ -79,6 +79,14 @@ func (s *depthSet) count() int {
 	return len(s.m)
 }
 
+func (from *depthSet) clone() (to *depthSet) {
+	to = newDepthSet()
+	for k := range from.m {
+		to.add(k)
+	}
+	return
+}
+
 type verifiedCiphertext struct {
 	verifiedDepths *depthSet
 	ciphertext     *tfheCiphertext

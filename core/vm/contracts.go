@@ -239,7 +239,7 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 // - any error that occurred
 func RunPrecompiledContract(p PrecompiledContract, accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if accessibleState.Interpreter().evm.Commit {
-		accessibleState.Interpreter().evm.Logger.Info("Calling precompiled contract", "callerAddr", caller, "precompile", addr)
+		accessibleState.Interpreter().evm.Logger.Info("Calling precompile", "callerAddr", caller, "precompile", addr)
 	}
 	gasCost := p.RequiredGas(accessibleState, input)
 	if suppliedGas < gasCost {
