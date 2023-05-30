@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -588,8 +589,10 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		ct := new(tfheCiphertext)
 		err := ct.deserialize(ctBytes, metadata.fheUintType)
 		if err != nil {
-			interpreter.evm.Logger.Error("opSload failed to deserialize a ciphertext, exiting process", "err", err)
-			exitProcess()
+			interpreter.evm.Logger.Error("opSload failed to deserialize a ciphertext", "err", err)
+			if err != nil {
+				panic("Cannot deserialize value")
+			}
 		}
 		importCiphertextToEVM(interpreter, ct)
 	}
@@ -625,6 +628,13 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		ctPart32 := make([]byte, 32)
 		partIdx := 0
 		ctBytes := verifiedCiphertext.ciphertext.serialize()
+
+		if uint64(len(ctBytes)) != metadata.length {
+			// This can probably happen due to mismatch between tfhe-rs versions and the hardcoded encrypted sizes in tfhe.go
+			interpreter.evm.Logger.Error(fmt.Sprintf("Mismatch between encrypted size (%d) and expected length (%d)", len(ctBytes), metadata.length))
+			panic("mismatch in encryption length")
+		}
+
 		for i, b := range ctBytes {
 			if i%32 == 0 && i != 0 {
 				interpreter.evm.StateDB.SetState(protectedStorage, ciphertextSlot.Bytes32(), common.BytesToHash(ctPart32))
