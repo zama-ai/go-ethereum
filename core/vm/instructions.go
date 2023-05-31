@@ -835,11 +835,21 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 }
 
 // If there are ciphertext handles in the arguments to a call, delegate them to the callee.
-func delegateCiphertextHandlesInArgs(interpreter *EVMInterpreter, args []byte) {
+// Return a map from ciphertext hash -> depthSet before delegation.
+func delegateCiphertextHandlesInArgs(interpreter *EVMInterpreter, args []byte) (verified map[common.Hash]*depthSet) {
+	verified = make(map[common.Hash]*depthSet)
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
 		if contains(args, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
+			verified[key] = verifiedCiphertext.verifiedDepths.clone()
 			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth + 1)
 		}
+	}
+	return
+}
+
+func restoreVerifiedDepths(interpreter *EVMInterpreter, verified map[common.Hash]*depthSet) {
+	for k, v := range verified {
+		interpreter.verifiedCiphertexts[k].verifiedDepths = v
 	}
 }
 
@@ -867,15 +877,14 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 		bigVal = value.ToBig()
 	}
 
-	delegateCiphertextHandlesInArgs(interpreter, args)
-
+	verifiedBefore := delegateCiphertextHandlesInArgs(interpreter, args)
 	ret, returnGas, err := interpreter.evm.Call(scope.Contract, toAddr, args, gas, bigVal)
-
 	if err != nil {
 		temp.Clear()
 	} else {
 		temp.SetOne()
 	}
+	restoreVerifiedDepths(interpreter, verifiedBefore)
 	stack.push(&temp)
 	if err == nil || err == ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
@@ -906,14 +915,14 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		bigVal = value.ToBig()
 	}
 
-	delegateCiphertextHandlesInArgs(interpreter, args)
-
+	verifiedBefore := delegateCiphertextHandlesInArgs(interpreter, args)
 	ret, returnGas, err := interpreter.evm.CallCode(scope.Contract, toAddr, args, gas, bigVal)
 	if err != nil {
 		temp.Clear()
 	} else {
 		temp.SetOne()
 	}
+	restoreVerifiedDepths(interpreter, verifiedBefore)
 	stack.push(&temp)
 	if err == nil || err == ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
@@ -937,14 +946,14 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
-	delegateCiphertextHandlesInArgs(interpreter, args)
-
+	verifiedBefore := delegateCiphertextHandlesInArgs(interpreter, args)
 	ret, returnGas, err := interpreter.evm.DelegateCall(scope.Contract, toAddr, args, gas)
 	if err != nil {
 		temp.Clear()
 	} else {
 		temp.SetOne()
 	}
+	restoreVerifiedDepths(interpreter, verifiedBefore)
 	stack.push(&temp)
 	if err == nil || err == ErrExecutionReverted {
 		ret = common.CopyBytes(ret)
@@ -968,14 +977,14 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
-	delegateCiphertextHandlesInArgs(interpreter, args)
-
+	verifiedBefore := delegateCiphertextHandlesInArgs(interpreter, args)
 	ret, returnGas, err := interpreter.evm.StaticCall(scope.Contract, toAddr, args, gas)
 	if err != nil {
 		temp.Clear()
 	} else {
 		temp.SetOne()
 	}
+	restoreVerifiedDepths(interpreter, verifiedBefore)
 	stack.push(&temp)
 	if err == nil || err == ErrExecutionReverted {
 		ret = common.CopyBytes(ret)

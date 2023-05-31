@@ -792,7 +792,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 		t.Fatalf("metadata.refcount of ciphertext is not 1")
 	}
 	if metadata.length != uint64(fheCiphertextSize[FheUint8]) {
-		t.Fatalf("metadata.length of ciphertext is incorrect")
+		t.Fatalf("metadata.length (%v) != ciphertext len (%v)", metadata.length, uint64(fheCiphertextSize[FheUint8]))
 	}
 	ciphertextLocationsToCheck := (metadata.length + 32 - 1) / 32
 	startOfCiphertext := newInt(ctHash[:])
@@ -968,18 +968,48 @@ var callsToTest = []OpCodeFun{
 	&vOpStaticCall,
 }
 
-func setupOpCall(call OpCodeFun, interpreter *EVMInterpreter, callArg common.Hash) (pc uint64, scope *ScopeContext) {
+var testPrecompileAddress common.Address = common.BytesToAddress([]byte{255})
+var testPrecompileNumber *uint256.Int = uint256.NewInt(255)
+
+type testPrecompile struct {
+	depths map[common.Hash]*depthSet
+}
+
+func newTestPrecompile(ctHashes []common.Hash) *testPrecompile {
+	p := &testPrecompile{}
+	p.depths = make(map[common.Hash]*depthSet)
+	for _, ctHash := range ctHashes {
+		p.depths[ctHash] = newDepthSet()
+	}
+	return p
+}
+
+func (e *testPrecompile) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	return 0
+}
+
+func (e *testPrecompile) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	for ctHash, depthSet := range e.depths {
+		ct, found := accessibleState.Interpreter().verifiedCiphertexts[ctHash]
+		if found {
+			for d := range ct.verifiedDepths.m {
+				depthSet.add(d)
+			}
+		}
+	}
+	return nil, nil
+}
+
+func setupOpCall(call OpCodeFun, interpreter *EVMInterpreter, callArgs []byte, addr *uint256.Int) (pc uint64, scope *ScopeContext) {
 	pc = uint64(0)
 	scope = newTestScopeConext()
 
 	retSize := uint256.NewInt(32)
 	retOffset := uint256.NewInt(32)
-	inSize := uint256.NewInt(32)
+	inSize := uint256.NewInt(uint64(len(callArgs)))
 	inOffset := uint256.NewInt(0)
-	scope.Memory.Set(inOffset.Uint64(), inSize.Uint64(), callArg[:])
+	scope.Memory.Set(inOffset.Uint64(), inSize.Uint64(), callArgs)
 	value := uint256.NewInt(0)
-	addr := uint256.NewInt(0)
-	addr.SetBytes([]byte{74}) // Call fheRand.
 	gas := uint256.NewInt(99999999999)
 	interpreter.evm.callGasTemp = gas.Uint64()
 
@@ -996,56 +1026,143 @@ func setupOpCall(call OpCodeFun, interpreter *EVMInterpreter, callArg common.Has
 	return
 }
 
-func TestOpCallDelegatesIfHandleInArgs(t *testing.T) {
+func setupTestPrecompile(ctHashes []common.Hash) (precompile *testPrecompile) {
+	precompile = newTestPrecompile(ctHashes)
+	PrecompiledContractsHomestead[testPrecompileAddress] = precompile
+	PrecompiledContractsByzantium[testPrecompileAddress] = precompile
+	PrecompiledContractsIstanbul[testPrecompileAddress] = precompile
+	PrecompiledContractsBerlin[testPrecompileAddress] = precompile
+	return
+}
+
+func TestOpCallNonPrecompileWithHandleInArgs(t *testing.T) {
 	for _, call := range callsToTest {
 		depth := 2
 		interpreter := newTestInterpreter()
 		interpreter.evm.depth = depth
 		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
-		pc, scope := setupOpCall(call, interpreter, ctHash)
+		// Call a non-precompile contract at address 9999999.
+		pc, scope := setupOpCall(call, interpreter, ctHash.Bytes(), uint256.NewInt(9999999))
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
 
-		// Increment depth as if we are still in the called contract.
-		// Here, we assume opCall *itself* doesn't change depth. Instead, it is interpreter.Run() that does it.
-		// However, since we pass 0 as address, we won't actually call interpreter.Run().
-		if interpreter.evm.depth != depth {
-			t.Fatalf("expected opcall doesn't change depth")
-		}
-		interpreter.evm.depth++
-
-		// Check if the handle is verified.
 		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
 		if ct == nil {
-			t.Fatalf("expected ciphertext is verified after opcall")
+			t.Fatalf("expected ciphertext is verified at depth (%d) after opcall", depth)
+		}
+
+		interpreter.evm.depth++
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct != nil {
+			t.Fatalf("expected ciphertext is not verified at depth + 1 (%d) after opcall", depth+1)
 		}
 	}
 }
 
-func TestOpCallDoesNotDelegateIfHandleNotInArgs(t *testing.T) {
+func TestOpCallPrecompileWithHandleInArgs(t *testing.T) {
 	for _, call := range callsToTest {
 		depth := 2
 		interpreter := newTestInterpreter()
 		interpreter.evm.depth = depth
 		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
-		pc, scope := setupOpCall(call, interpreter, common.Hash{})
+		pc, scope := setupOpCall(call, interpreter, ctHash.Bytes(), testPrecompileNumber)
+		testPrecompile := setupTestPrecompile([]common.Hash{ctHash})
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
 
-		// See rationale in TestOpCallDelegatesIfHandleInArgs() for more information.
-		if interpreter.evm.depth != depth {
-			t.Fatalf("expected opcall doesn't change depth")
-		}
-		interpreter.evm.depth++
-
-		// Check if the handle is verified.
 		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct == nil {
+			t.Fatalf("expected ciphertext is verified at depth (%d) after opcall", depth)
+		}
+
+		interpreter.evm.depth++
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
 		if ct != nil {
-			t.Fatalf("expected ciphertext is not verified after opcall")
+			t.Fatalf("expected ciphertext is not verified at depth +1 (%d) after opcall", depth+1)
+		}
+
+		// Make sure the cipherext was verified at depth + 1 during the call.
+		// TODO: Add the same test, but for a non-precompiled contract.
+		if testPrecompile.depths[ctHash].count() != 2 || !testPrecompile.depths[ctHash].has(depth+1) {
+			t.Fatalf("expected ciphertext was verified at depth + 1 (%d) during call", depth+1)
+		}
+	}
+}
+
+func TestOpCallPrecompileWithTwoHandlesInArgs(t *testing.T) {
+	for _, call := range callsToTest {
+		depth := 2
+		interpreter := newTestInterpreter()
+		interpreter.evm.depth = depth
+		ctHash1 := verifyCiphertextInTestMemory(interpreter, 1, depth, FheUint8).getHash()
+		ctHash2 := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
+		pc, scope := setupOpCall(call, interpreter, append(ctHash1.Bytes(), ctHash2.Bytes()...), testPrecompileNumber)
+		testPrecompile := setupTestPrecompile([]common.Hash{ctHash1, ctHash2})
+		_, err := (*call)(&pc, interpreter, scope)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash1)
+		if ct == nil {
+			t.Fatalf("expected ciphertext1 is verified at depth (%d) after opcall", depth)
+		}
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash2)
+		if ct == nil {
+			t.Fatalf("expected ciphertext2 is verified at depth (%d) after opcall", depth)
+		}
+
+		interpreter.evm.depth++
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash1)
+		if ct != nil {
+			t.Fatalf("expected ciphertext1 is not verified at depth +1 (%d) after opcall", depth+1)
+		}
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash2)
+		if ct != nil {
+			t.Fatalf("expected ciphertext2 is not verified at depth +1 (%d) after opcall", depth+1)
+		}
+
+		// Make sure cipherext1 and ciphertext2 were both verified at depth + 1 during the call.
+		// TODO: Add the same test, but for a non-precompiled contract.
+		if testPrecompile.depths[ctHash1].count() != 2 || !testPrecompile.depths[ctHash1].has(depth+1) {
+			t.Fatalf("expected ciphertext1 was verified at depth + 1 (%d) during call", depth+1)
+		}
+		if testPrecompile.depths[ctHash2].count() != 2 || !testPrecompile.depths[ctHash2].has(depth+1) {
+			t.Fatalf("expected ciphertext2 was verified at depth + 1 (%d) during call", depth+1)
+		}
+	}
+}
+
+func TestOpCallPrecompileNoHandleInArgs(t *testing.T) {
+	for _, call := range callsToTest {
+		depth := 2
+		interpreter := newTestInterpreter()
+		interpreter.evm.depth = depth
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
+		pc, scope := setupOpCall(call, interpreter, common.Hash{}.Bytes(), testPrecompileNumber)
+		testPrecompile := setupTestPrecompile([]common.Hash{ctHash})
+		_, err := (*call)(&pc, interpreter, scope)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct == nil {
+			t.Fatalf("expected ciphertext is verified at depth (%d) after opcall", depth)
+		}
+
+		interpreter.evm.depth++
+		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
+		if ct != nil {
+			t.Fatalf("expected ciphertext is not verified at depth + 1 (%d) after opcall", depth+1)
+		}
+
+		if testPrecompile.depths[ctHash].count() != 1 || testPrecompile.depths[ctHash].has(depth+1) {
+			t.Fatalf("expected test precompile was not verified at depth + 1 (%d)", depth+1)
 		}
 	}
 }
@@ -1053,68 +1170,72 @@ func TestOpCallDoesNotDelegateIfHandleNotInArgs(t *testing.T) {
 func TestOpCallVerifySameCiphertextDeeperInStack(t *testing.T) {
 	for _, call := range callsToTest {
 		interpreter := newTestInterpreter()
-		interpreter.evm.depth = 2
-		ct := verifyCiphertextInTestMemory(interpreter, 2, 2, FheUint8)
+		depth := 2
+		interpreter.evm.depth = depth
+		ct := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8)
 
-		pc, scope := setupOpCall(call, interpreter, common.Hash{})
+		// Call a non-precompile contract at address 9999999.
+		pc, scope := setupOpCall(call, interpreter, common.Hash{}.Bytes(), uint256.NewInt(9999999))
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
 
-		// Simulate a verification by the code running at depth 3. It could, for example, be due to an SLOAD.
-		interpreter.evm.depth = 3
-		ct = verifyTfheCiphertextInTestMemory(interpreter, ct, 3)
+		// Simulate a verification by the code running at depth + 1. It could, for example, be due to an SLOAD.
+		interpreter.evm.depth = depth + 1
+		ct = verifyTfheCiphertextInTestMemory(interpreter, ct, depth+1)
 
 		// Make sure the ciphertext remains verified at depth 2, even though there is no return opcode
 		// to make it available from depth 3 to depth 2.
-		interpreter.evm.depth = 2
+		interpreter.evm.depth = depth
 		verifiedCiphertext := getVerifiedCiphertextFromEVM(interpreter, ct.getHash())
 		if verifiedCiphertext == nil {
-			t.Fatalf("expected that the ciphertext is still verified at depth 2")
+			t.Fatalf("expected that the ciphertext is still verified at depth (%d)", depth)
 		}
 	}
 }
 
 func TestOpCallDoesNotDelegateIfNotVerified(t *testing.T) {
 	for _, call := range callsToTest {
-		verifiedAtDepth := 2
+		verifiedDepth := 2
 		interpreter := newTestInterpreter()
-		interpreter.evm.depth = verifiedAtDepth + 1
-		ctHash := verifyCiphertextInTestMemory(interpreter, 2, verifiedAtDepth, FheUint8).getHash()
-		pc, scope := setupOpCall(call, interpreter, ctHash)
+		interpreter.evm.depth = verifiedDepth + 1
+		ctHash := verifyCiphertextInTestMemory(interpreter, 2, verifiedDepth, FheUint8).getHash()
+		pc, scope := setupOpCall(call, interpreter, ctHash.Bytes(), testPrecompileNumber)
+		testPrecompile := setupTestPrecompile([]common.Hash{ctHash})
+		// Call at verifiedDepth + 1.
 		_, err := (*call)(&pc, interpreter, scope)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
 
-		// See rationale in TestOpCallDelegatesIfHandleInArgs() for more information.
-		if interpreter.evm.depth != verifiedAtDepth+1 {
-			t.Fatalf("expected opcall doesn't change depth")
-		}
+		// Ciphertext must not be verified at verifiedDepth + 2.
 		interpreter.evm.depth++
-
-		// Check if the handle is verified verifiedDepth + 2.
 		ct := getVerifiedCiphertextFromEVM(interpreter, ctHash)
 		if ct != nil {
-			t.Fatalf("expected ciphertext is not verified after opcall at verifiedAtDepth + 2")
+			t.Fatalf("expected ciphertext is not verified after opcall at verifiedDepth + 2 (%d)", verifiedDepth+2)
 		}
 
-		// Check if the handle is verified verifiedDepth + 1.
+		// Ciphertext must not be verified at verifiedDepth + 1.
 		interpreter.evm.depth--
 		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
 		if ct != nil {
-			t.Fatalf("expected ciphertext is not verified after opcall at verifiedAtDepth + 1")
+			t.Fatalf("expected ciphertext is not verified after opcall at verifiedDepth + 1 (%d)", verifiedDepth+1)
 		}
 
-		// Check if the handle is verified verifiedDepth.
+		// Ciphertext must be verified at verifiedDepth.
 		interpreter.evm.depth--
 		ct = getVerifiedCiphertextFromEVM(interpreter, ctHash)
 		if ct == nil {
-			t.Fatalf("expected ciphertext is verified after opcall at verifiedAtDepth")
+			t.Fatalf("expected ciphertext is verified after opcall at verifiedDepth (%d)", verifiedDepth)
 		}
 		if ct.verifiedDepths.count() != 1 || !ct.verifiedDepths.has(interpreter.evm.depth) {
-			t.Fatalf("expected ciphertext to be verified at verifiedAtDepth")
+			t.Fatalf("expected ciphertext to be verified at verifiedAtDepth (%d)", verifiedDepth)
+		}
+
+		// Ciphertext must have only been verified at verifiedDepth during the call.
+		if !(testPrecompile.depths[ctHash].count() == 1 && testPrecompile.depths[ctHash].has(verifiedDepth)) {
+			t.Fatalf("expected that testPrecompile was only verified at verifiedDepth (%d) during the call", verifiedDepth)
 		}
 	}
 }

@@ -488,7 +488,7 @@ func FheAdd(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted := res.ciphertext.decrypt()
 	if decrypted.Uint64() != expected {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
 
@@ -525,7 +525,7 @@ func FheSub(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted := res.ciphertext.decrypt()
 	if decrypted.Uint64() != expected {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
 
@@ -562,7 +562,7 @@ func FheMul(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted := res.ciphertext.decrypt()
 	if decrypted.Uint64() != expected {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
 
@@ -600,7 +600,7 @@ func FheLte(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted := res.ciphertext.decrypt()
 	if decrypted.Uint64() != 0 {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 	}
 
 	// rhs <= lhs
@@ -615,7 +615,7 @@ func FheLte(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted = res.ciphertext.decrypt()
 	if decrypted.Uint64() != 1 {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 	}
 }
 
@@ -654,7 +654,7 @@ func FheLt(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted := res.ciphertext.decrypt()
 	if decrypted.Uint64() != 0 {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 	}
 
 	// rhs < lhs
@@ -669,7 +669,7 @@ func FheLt(t *testing.T, fheUintType fheUintType) {
 	}
 	decrypted = res.ciphertext.decrypt()
 	if decrypted.Uint64() != 1 {
-		t.Fatalf("invalid decrypted result")
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 	}
 }
 
@@ -794,7 +794,7 @@ func TestCiphertextNotAutomaticallyDelegated(t *testing.T) {
 
 	ct := getVerifiedCiphertext(state, hash)
 	if ct != nil {
-		t.Fatalf("expected that ciphertext is not verified")
+		t.Fatalf("expected that ciphertext is not verified at depth (%d)", state.interpreter.evm.depth)
 	}
 }
 
@@ -806,18 +806,18 @@ func TestCiphertextVerificationConditions(t *testing.T) {
 	state.interpreter.evm.depth = verifiedDepth
 	ctPtr := getVerifiedCiphertext(state, hash)
 	if ctPtr == nil {
-		t.Fatalf("expected that ciphertext is verified at verifiedDepth")
+		t.Fatalf("expected that ciphertext is verified at verifiedDepth (%d)", verifiedDepth)
 	}
 
 	state.interpreter.evm.depth = verifiedDepth + 1
 	ct := getVerifiedCiphertext(state, hash)
 	if ct != nil {
-		t.Fatalf("expected that ciphertext is not verified at verifiedDepth + 1")
+		t.Fatalf("expected that ciphertext is not verified at verifiedDepth + 1 (%d)", verifiedDepth+1)
 	}
 
 	state.interpreter.evm.depth = verifiedDepth - 1
 	ct = getVerifiedCiphertext(state, hash)
 	if ct != nil {
-		t.Fatalf("expected that ciphertext is not verified at verifiedDepth - 1")
+		t.Fatalf("expected that ciphertext is not verified at verifiedDepth - 1 (%d)", verifiedDepth-1)
 	}
 }
