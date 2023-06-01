@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"encoding/hex"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -612,6 +613,7 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 	if verifiedCiphertext == nil {
 		return
 	}
+	logger := interpreter.evm.Logger
 	// Try to read ciphertext metadata from protected storage.
 	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	metadata := ciphertextMetadata{}
@@ -622,6 +624,12 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		metadata.fheUintType = verifiedCiphertext.ciphertext.fheUintType
 		ciphertextSlot := newInt(val.Bytes())
 		ciphertextSlot.AddUint64(ciphertextSlot, 1)
+		logger.Info("opSstore persisting new ciphertext",
+			"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+			"handle", hex.EncodeToString(val.Bytes()),
+			"type", metadata.fheUintType,
+			"len", metadata.length,
+			"ciphertextSlot", hex.EncodeToString(ciphertextSlot.Bytes()))
 		ctPart32 := make([]byte, 32)
 		partIdx := 0
 		ctBytes := verifiedCiphertext.ciphertext.serialize()
@@ -642,6 +650,12 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		// If metadata exists, bump the refcount by 1.
 		metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
 		metadata.refCount++
+		logger.Info("opSstore bumping refcount of existing ciphertext",
+			"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+			"handle", hex.EncodeToString(val.Bytes()),
+			"type", metadata.fheUintType,
+			"len", metadata.length,
+			"refCount", metadata.refCount)
 	}
 	// Save the metadata in protected storage.
 	interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
@@ -652,8 +666,15 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, metadataKey)
 	existingMetadataInt := newInt(existingMetadataHash.Bytes())
 	if !existingMetadataInt.IsZero() {
+		logger := interpreter.evm.Logger
 		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
 		if metadata.refCount == 1 {
+			logger.Info("opSstore garbage-collecting ciphertext",
+				"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+				"metadataKey", hex.EncodeToString(metadataKey[:]),
+				"type", metadata.fheUintType,
+				"len", metadata.length)
+
 			// Zero the metadata key-value.
 			interpreter.evm.StateDB.SetState(protectedStorage, metadataKey, zero)
 
@@ -671,6 +692,11 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 				slot.AddUint64(slot, 1)
 			}
 		} else if metadata.refCount > 1 {
+			logger.Info("opSstore decrementing ciphertext refCount",
+				"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+				"metadataKey", hex.EncodeToString(metadataKey[:]),
+				"type", metadata.fheUintType,
+				"len", metadata.length)
 			metadata.refCount--
 			interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, metadata.serialize())
 		}
@@ -840,6 +866,12 @@ func delegateCiphertextHandlesInArgs(interpreter *EVMInterpreter, args []byte) (
 	verified = make(map[common.Hash]*depthSet)
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
 		if contains(args, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
+			if interpreter.evm.Commit {
+				interpreter.evm.Logger.Info("delegateCiphertextHandlesInArgs",
+					"handle", verifiedCiphertext.ciphertext.getHash().Hex(),
+					"fromDepth", interpreter.evm.depth,
+					"toDepth", interpreter.evm.depth+1)
+			}
 			verified[key] = verifiedCiphertext.verifiedDepths.clone()
 			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth + 1)
 		}
@@ -1002,8 +1034,19 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 
 	for key, verifiedCiphertext := range interpreter.verifiedCiphertexts {
 		if contains(ret, key.Bytes()) && isVerifiedAtCurrentDepth(interpreter, verifiedCiphertext) {
+			if interpreter.evm.Commit {
+				interpreter.evm.Logger.Info("opReturn making ciphertext available to caller",
+					"handle", verifiedCiphertext.ciphertext.getHash().Hex(),
+					"fromDepth", interpreter.evm.depth,
+					"toDepth", interpreter.evm.depth-1)
+			}
 			// If a handle is returned, automatically make it available to the caller.
 			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth - 1)
+		}
+		if interpreter.evm.Commit {
+			interpreter.evm.Logger.Info("opReturn removing ciphertext from depth",
+				"handle", verifiedCiphertext.ciphertext.getHash().Hex(),
+				"depth", interpreter.evm.depth)
 		}
 		// Delete the current EVM depth. Do that after the `isVerifiedAtCurrentDepth()` check.
 		verifiedCiphertext.verifiedDepths.del(interpreter.evm.depth)

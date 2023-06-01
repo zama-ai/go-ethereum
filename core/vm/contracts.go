@@ -1333,31 +1333,30 @@ var fheRequireGasCosts = map[fheUintType]uint64{
 type fheAdd struct{}
 
 func (e *fheAdd) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheAdd/Sub RequiredGas() inputs not verified",
-			"err", err, "input", hex.EncodeToString(input))
+		logger.Error("fheAdd/Sub RequiredGas() inputs not verified", "err", err, "input", hex.EncodeToString(input))
 		return 0
 	}
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
-		accessibleState.Interpreter().evm.Logger.Error("fheAdd/Sub RequiredGas() operand type mismatch", "lhs",
-			lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		logger.Error("fheAdd/Sub RequiredGas() operand type mismatch", "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return 0
 	}
 	return fheAddSubGasCosts[lhs.ciphertext.fheUintType]
 }
 
 func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheAdd inputs not verified",
-			"err", err, "input", hex.EncodeToString(input))
+		logger.Error("fheAdd inputs not verified", "err", err, "input", hex.EncodeToString(input))
 		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
 		msg := "fheAdd operand type mismatch"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
 
@@ -1368,7 +1367,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	result, err := lhs.ciphertext.add(rhs.ciphertext)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheAdd failed", "err", err)
+		logger.Error("fheAdd failed", "err", err)
 		return nil, err
 	}
 	importCiphertext(accessibleState, result)
@@ -1376,12 +1375,13 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	// TODO: for testing
 	err = os.WriteFile("/tmp/add_result", result.serialize(), 0644)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheAdd failed to write /tmp/add_result", "err", err)
+		logger.Error("fheAdd failed to write /tmp/add_result", "err", err)
 		return nil, err
 	}
 
-	ctHash := result.getHash()
-	return ctHash[:], nil
+	resultHash := result.getHash()
+	logger.Info("fheAdd success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
 }
 
 func classicalPublicKeyEncrypt(value *big.Int, userPublicKey []byte) ([]byte, error) {
@@ -1425,9 +1425,10 @@ func (e *verifyCiphertext) RequiredGas(accessibleState PrecompileAccessibleState
 }
 
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	if len(input) <= 1 {
 		msg := "verifyCiphertext RequiredGas() input needs to contain a ciphertext and one byte for its type"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "len", len(input))
+		logger.Error(msg, "len", len(input))
 		return nil, errors.New(msg)
 	}
 
@@ -1442,11 +1443,17 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	ct := new(tfheCiphertext)
 	err := ct.deserialize(ctBytes, ctType)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("verifyCiphertext failed to deserialize input ciphertext", "err", err)
+		logger.Error("verifyCiphertext failed to deserialize input ciphertext",
+			"err", err,
+			"len", len(ctBytes),
+			"ctBytes64", hex.EncodeToString(ctBytes[:minInt(len(ctBytes), 64)]))
 		return nil, err
 	}
 	ctHash := ct.getHash()
 	importCiphertext(accessibleState, ct)
+	logger.Info("verifyCiphertext success",
+		"ctHash", ctHash.Hex(),
+		"ctBytes64", hex.EncodeToString(ctBytes[:minInt(len(ctBytes), 64)]))
 	return ctHash.Bytes(), nil
 }
 
@@ -1465,29 +1472,29 @@ func toEVMBytes(input []byte) []byte {
 type reencrypt struct{}
 
 func (e *reencrypt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
 	if len(input) != 32 {
-		accessibleState.Interpreter().evm.Logger.Error("reencrypt RequiredGas() input len must be 32 bytes",
-			"input", hex.EncodeToString(input), "len", len(input))
+		logger.Error("reencrypt RequiredGas() input len must be 32 bytes", "input", hex.EncodeToString(input), "len", len(input))
 		return 0
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct == nil {
-		accessibleState.Interpreter().evm.Logger.Error("reencrypt RequiredGas() input doesn't point to verified ciphertext",
-			"input", hex.EncodeToString(input))
+		logger.Error("reencrypt RequiredGas() input doesn't point to verified ciphertext", "input", hex.EncodeToString(input))
 		return 0
 	}
 	return fheReencryptGasCosts[ct.ciphertext.fheUintType]
 }
 
 func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	if !accessibleState.Interpreter().evm.EthCall {
 		msg := "reencrypt only supported on EthCall"
-		accessibleState.Interpreter().evm.Logger.Error(msg)
+		logger.Error(msg)
 		return nil, errors.New(msg)
 	}
 	if len(input) != 64 {
 		msg := "reencrypt input len must be 64 bytes"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
+		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
@@ -1496,28 +1503,28 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 		pubKey := input[32:64]
 		reencryptedValue, err := encryptToUserKey(&decryptedValue, pubKey)
 		if err != nil {
-			accessibleState.Interpreter().evm.Logger.Error("reencrypt failed to encrypt to user key", "err", err)
+			logger.Error("reencrypt failed to encrypt to user key", "err", err)
 			return nil, err
 		}
+		logger.Info("reencrypt success", "input", hex.EncodeToString(input), "callerAddr", caller)
 		return toEVMBytes(reencryptedValue), nil
 	}
 	msg := "reencrypt unverified ciphertext handle"
-	accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input))
+	logger.Error(msg, "input", hex.EncodeToString(input))
 	return nil, errors.New(msg)
 }
 
 type require struct{}
 
 func (e *require) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
 	if len(input) != 32 {
-		accessibleState.Interpreter().evm.Logger.Error("require RequiredGas() input len must be 32 bytes",
-			"input", hex.EncodeToString(input), "len", len(input))
+		logger.Error("require RequiredGas() input len must be 32 bytes", "input", hex.EncodeToString(input), "len", len(input))
 		return 0
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct == nil {
-		accessibleState.Interpreter().evm.Logger.Error("require RequiredGas() input doesn't point to verified ciphertext",
-			"input", hex.EncodeToString(input))
+		logger.Error("require RequiredGas() input doesn't point to verified ciphertext", "input", hex.EncodeToString(input))
 		return 0
 	}
 	return fheRequireGasCosts[ct.ciphertext.fheUintType]
@@ -1540,36 +1547,38 @@ func requireURL(key *string) string {
 // Puts the given ciphertext as a require to the oracle DB or exits the process on errors.
 // Returns the require value.
 func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
+	logger := interpreter.evm.Logger
 	ciphertext := ct.serialize()
 	plaintext := ct.decrypt()
 	value := (plaintext.BitLen() != 0)
 	key := requireKey(ciphertext)
 	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
 	if err != nil {
-		interpreter.evm.Logger.Error("putRequire JSON Marshal() failed, exiting process", "err", err)
+		logger.Error("putRequire JSON Marshal() failed, exiting process", "err", err, "key", key)
 		exitProcess()
 	}
 	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
 		req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
 		if err != nil {
-			interpreter.evm.Logger.Error("putRequire NewRequest() failed, retrying", "err", err)
+			logger.Error("putRequire NewRequest() failed, retrying", "err", err, "key", key)
 			continue
 		}
 		resp, err := requireHttpClient.Do(req)
 		if err != nil {
-			interpreter.evm.Logger.Error("putRequire HTTP request Do() failed, retrying", "err", err)
+			logger.Error("putRequire HTTP request Do() failed, retrying", "err", err, "key", key)
 			continue
 		}
 		defer resp.Body.Close()
 		io.ReadAll(resp.Body)
 		if resp.StatusCode != 200 {
-			interpreter.evm.Logger.Error("putRequire received HTTP status code != 200, retrying", "code", resp.StatusCode)
+			logger.Error("putRequire received HTTP status code != 200, retrying", "code", resp.StatusCode, "key", key)
 			continue
 		}
+		logger.Info("putRequire sucess", "value", value, "key", key)
 		return value
 	}
-	interpreter.evm.Logger.Error("putRequire reached maximum retries, exiting process",
-		"retries", tomlConfig.Oracle.RequireRetryCount)
+	logger.Error("putRequire reached maximum retries, exiting process",
+		"retries", tomlConfig.Oracle.RequireRetryCount, "key", key)
 	exitProcess()
 	return value
 }
@@ -1577,44 +1586,45 @@ func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
 // Gets the given require from the oracle DB and returns its value.
 // Exits the process on errors or signature verification failure.
 func getRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
+	logger := interpreter.evm.Logger
 	ciphertext := ct.serialize()
 	key := requireKey(ciphertext)
 	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
 		req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
 		if err != nil {
-			interpreter.evm.Logger.Error("getRequire NewRequest() failed, retrying", "err", err)
+			logger.Error("getRequire NewRequest() failed, retrying", "err", err)
 			continue
 		}
 		resp, err := requireHttpClient.Do(req)
 		if err != nil {
-			interpreter.evm.Logger.Error("getRequire HTTP request Do() failed, retrying", "err", err)
+			logger.Error("getRequire HTTP request Do() failed, retrying", "err", err)
 			continue
 		}
 		defer resp.Body.Close()
 		body, err := io.ReadAll(resp.Body)
 		if resp.StatusCode != 200 || err != nil {
-			interpreter.evm.Logger.Error("getRequire HTTP response with failure, retrying", "err", err, "code", resp.StatusCode)
+			logger.Error("getRequire HTTP response with failure, retrying", "err", err, "code", resp.StatusCode)
 			continue
 		}
 		msg := requireMessage{}
 		if err := json.Unmarshal(body, &msg); err != nil {
-			interpreter.evm.Logger.Error("getRequire JSON Unmarshal() failed, retrying", "err", err)
+			logger.Error("getRequire JSON Unmarshal() failed, retrying", "err", err)
 			continue
 		}
 		b := requireBytesToSign(ciphertext, msg.Value)
 		s, err := hex.DecodeString(msg.Signature)
 		if err != nil {
-			interpreter.evm.Logger.Error("getRequire hex decode failed, retrying", "err", err)
+			logger.Error("getRequire hex decode failed, retrying", "err", err)
 			continue
 		}
 		if !ed25519.Verify(publicSignatureKey, b, s) {
-			interpreter.evm.Logger.Error("getRequire ed25519 signature failed to verify, retrying")
+			logger.Error("getRequire ed25519 signature failed to verify, retrying")
 			continue
 		}
+		logger.Info("getRequire success", "value", msg.Value, "key", key)
 		return msg.Value
 	}
-	interpreter.evm.Logger.Error("getRequire reached maximum retries, exiting process",
-		"retries", tomlConfig.Oracle.RequireRetryCount)
+	logger.Error("getRequire reached maximum retries, exiting process", "retries", tomlConfig.Oracle.RequireRetryCount)
 	exitProcess()
 	return false
 }
@@ -1687,14 +1697,15 @@ func (e *optimisticRequire) RequiredGas(accessibleState PrecompileAccessibleStat
 }
 
 func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	if accessibleState.Interpreter().evm.EthCall {
 		msg := "optimisticRequire not supported on EthCall"
-		accessibleState.Interpreter().evm.Logger.Error(msg)
+		logger.Error(msg)
 		return nil, errors.New(msg)
 	}
 	if len(input) != 32 {
 		msg := "optimisticRequire input len must be 32 bytes"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
+		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
 	// If we are not committing to state, assume the require is true, avoiding any side effects
@@ -1705,12 +1716,12 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
 	if !ok {
 		msg := "optimisticRequire unverified handle"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input))
+		logger.Error(msg, "input", hex.EncodeToString(input))
 		return nil, errors.New(msg)
 	}
 	if ct.ciphertext.fheUintType != FheUint32 {
 		msg := "optimisticRequire ciphertext type is not FheUint32"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "type", ct.ciphertext.fheUintType)
+		logger.Error(msg, "type", ct.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
 	// If this is the first optimistic require, just assign it.
@@ -1722,7 +1733,7 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 	} else {
 		optimisticRequire, err := accessibleState.Interpreter().optimisticRequire.mul(ct.ciphertext)
 		if err != nil {
-			accessibleState.Interpreter().evm.Logger.Error("optimisticRequire mul failed", "err", err)
+			logger.Error("optimisticRequire mul failed", "err", err)
 			return nil, err
 		}
 		accessibleState.Interpreter().optimisticRequire = optimisticRequire
@@ -1747,15 +1758,16 @@ func (e *fheLte) RequiredGas(accessibleState PrecompileAccessibleState, input []
 }
 
 func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLte inputs not verified", "err", err)
+		logger.Error("fheLte inputs not verified", "err", err)
 		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
 		msg := "fheLte operand type mismatch"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
 
@@ -1766,7 +1778,7 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	result, err := lhs.ciphertext.lte(rhs.ciphertext)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLte failed", "err", err)
+		logger.Error("fheLte failed", "err", err)
 		return nil, err
 	}
 	importCiphertext(accessibleState, result)
@@ -1774,13 +1786,13 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	// TODO: for testing
 	err = os.WriteFile("/tmp/lte_result", result.serialize(), 0644)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheAdd failed to write /tmp/lte_result", "err", err)
+		logger.Error("fheAdd failed to write /tmp/lte_result", "err", err)
 		return nil, err
 	}
 
-	ctHash := result.getHash()
-
-	return ctHash[:], nil
+	resultHash := result.getHash()
+	logger.Info("fheLte success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
 }
 
 type fheSub struct{}
@@ -1792,15 +1804,16 @@ func (e *fheSub) RequiredGas(accessibleState PrecompileAccessibleState, input []
 }
 
 func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheSub inputs not verified", "err", err)
+		logger.Error("fheSub inputs not verified", "err", err)
 		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
 		msg := "fheSub operand type mismatch"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
 
@@ -1811,7 +1824,7 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 	result, err := lhs.ciphertext.sub(rhs.ciphertext)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheSub failed", "err", err)
+		logger.Error("fheSub failed", "err", err)
 		return nil, err
 	}
 	importCiphertext(accessibleState, result)
@@ -1819,13 +1832,13 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	// TODO: for testing
 	err = os.WriteFile("/tmp/sub_result", result.serialize(), 0644)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheSub failed to write /tmp/sub_result", "err", err)
+		logger.Error("fheSub failed to write /tmp/sub_result", "err", err)
 		return nil, err
 	}
 
-	ctHash := result.getHash()
-
-	return ctHash[:], nil
+	resultHash := result.getHash()
+	logger.Info("fheSub success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
 }
 
 type fheMul struct{}
@@ -1890,15 +1903,16 @@ func (e *fheLt) RequiredGas(accessibleState PrecompileAccessibleState, input []b
 }
 
 func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLt inputs not verified", "err", err)
+		logger.Error("fheLt inputs not verified", "err", err)
 		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
 		msg := "fheLt operand type mismatch"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
 
@@ -1909,7 +1923,7 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 
 	result, err := lhs.ciphertext.lt(rhs.ciphertext)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLt failed", "err", err)
+		logger.Error("fheLt failed", "err", err)
 		return nil, err
 	}
 	importCiphertext(accessibleState, result)
@@ -1917,13 +1931,13 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 	// TODO: for testing
 	err = os.WriteFile("/tmp/lt_result", result.serialize(), 0644)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLt failed to write /tmp/lt_result", "err", err)
+		logger.Error("fheLt failed to write /tmp/lt_result", "err", err)
 		return nil, err
 	}
 
-	ctHash := result.getHash()
-
-	return ctHash[:], nil
+	resultHash := result.getHash()
+	logger.Info("fheLt success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
 }
 
 // type fheRand struct{}
@@ -2024,6 +2038,7 @@ func (e *faucet) RequiredGas(accessibleState PrecompileAccessibleState, input []
 }
 
 func (e *faucet) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	accessibleState.Interpreter().evm.Logger.Info("faucet called", "callerAddr", caller)
 	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(1000000000000000000))
 	return input, nil
 }
