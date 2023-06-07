@@ -443,7 +443,7 @@ var fheCiphertextSize map[fheUintType]uint
 var sks unsafe.Pointer
 var cks unsafe.Pointer
 var networkKeysDir string
-var usersKeysDir string
+var reencryptKeyDir string
 
 var allocatedCiphertexts uint64
 
@@ -461,7 +461,7 @@ func runGc() {
 func init() {
 	home := homeDir()
 	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
-	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
+	reencryptKeyDir = home + "/.evmosd/zama/keys/reencrypt-fhe-keys/"
 
 	sksBytes, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {

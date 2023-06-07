@@ -1369,7 +1369,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 }
 
 func fheEncryptToUserKey(value uint64, userAddress common.Address, t fheUintType) ([]byte, error) {
-	userPublicKey := strings.ToLower(usersKeysDir + userAddress.Hex())
+	userPublicKey := strings.ToLower(reencryptKeyDir + "key")
 	pks, err := os.ReadFile(userPublicKey)
 	if err != nil {
 		return nil, err
