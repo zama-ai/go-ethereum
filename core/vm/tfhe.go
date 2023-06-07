@@ -18,9 +18,9 @@ package vm
 
 /*
 #cgo CFLAGS: -O3
-#cgo LDFLAGS: -Llib -ltfhe
+#cgo LDFLAGS: -L/usr/lib/tfhe -ltfhe
 
-#include "tfhe.h"
+#include "/usr/include/tfhe.h"
 
 #undef NDEBUG
 #include <assert.h>
@@ -467,7 +467,7 @@ func init() {
 	fheCiphertextSize[FheUint32] = 112460
 
 	go runGc()
-	
+
 	home := homeDir()
 	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
 	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
