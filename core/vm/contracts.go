@@ -1473,8 +1473,8 @@ type reencrypt struct{}
 
 func (e *reencrypt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	logger := accessibleState.Interpreter().evm.Logger
-	if len(input) != 32 {
-		logger.Error("reencrypt RequiredGas() input len must be 32 bytes", "input", hex.EncodeToString(input), "len", len(input))
+	if len(input) != 64 {
+		logger.Error("reencrypt RequiredGas() input len must be 64 bytes", "input", hex.EncodeToString(input), "len", len(input))
 		return 0
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
