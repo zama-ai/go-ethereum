@@ -1,0 +1,57 @@
+[package]
+name = "tfhe-wrapper"
+version = "0.0.1"
+publish = false
+authors = ["SCRT Labs <scrtlabs@users.noreply.github.com>"]
+edition = "2021"
+description = "Go bindings for cosmwasm contracts"
+repository = ""
+license = "Apache-2.0"
+readme = "README.md"
+exclude = [".circleci/*", ".gitignore"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# the example is to allow us to compile a muslc static lib with the same codebase as we compile the
+# normal dynamic libs (best workaround I could find to override crate-type on the command line)
+[[example]]
+name = "muslc"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[[example]]
+name = "tfhestatic"
+path = "src/examples/tfhestatic.rs"
+crate-type = ["staticlib"]
+
+[features]
+default = []
+# This feature requires Rust nightly because it depends on the unstable backtrace feature.
+backtraces = []
+
+[dependencies]
+tfhe = { git = "https://github.com/zama-ai/tfhe-rs", features = ["high-level-c-api","seeder_unix","boolean","shortint","integer"] }
+serde = "1.0.163"
+bincode2 = "2.0.1"
+errno = "0.3.1"
+thiserror = "1.0.38"
+lazy_static = "1.4.0"
+
+[dev-dependencies]
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+tempfile = "3.4.0"
+
+[build-dependencies]
+cbindgen = "0.24.3"
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = true
+lto = false
+debug-assertions = false
+codegen-units = 16
+panic = 'unwind'
+incremental = true
+overflow-checks = true
