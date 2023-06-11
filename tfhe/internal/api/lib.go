@@ -29,6 +29,156 @@ type (
 	cu8_ptr = *C.uint8_t
 )
 
+func Add(lhs []byte, rhs []byte, uintType uint8) ([]byte, error) {
+	errmsg := uninitializedUnmanagedVector()
+
+	num1 := makeView(lhs)
+	defer runtime.KeepAlive(num1)
+
+	num2 := makeView(rhs)
+	defer runtime.KeepAlive(num2)
+
+	res := C.UnmanagedVector{}
+	var err error
+	switch uintType {
+	case 0:
+		res, err = C.add_uint8(num1, num2, &errmsg)
+		if err != nil {
+			return nil, errorWithMessage(err, errmsg)
+		}
+	case 1:
+		res, err = C.add_uint8(num1, num2, &errmsg)
+		if err != nil {
+			return nil, errorWithMessage(err, errmsg)
+		}
+	case 2:
+		res, err = C.add_uint8(num1, num2, &errmsg)
+		if err != nil {
+			return nil, errorWithMessage(err, errmsg)
+		}
+	default:
+		return nil, fmt.Errorf("invalid uint type")
+	}
+
+	return copyAndDestroyUnmanagedVector(res), nil
+}
+
+func Sub(lhs []byte, rhs []byte, uintType uint8) ([]byte, error) {
+	errmsg := uninitializedUnmanagedVector()
+
+	num1 := makeView(lhs)
+	defer runtime.KeepAlive(num1)
+
+	num2 := makeView(rhs)
+	defer runtime.KeepAlive(num2)
+
+	res := C.UnmanagedVector{}
+	var err error
+	switch uintType {
+	case 0:
+		res, err = C.sub_uint8(num1, num2, &errmsg)
+	case 1:
+		res, err = C.sub_uint8(num1, num2, &errmsg)
+	case 2:
+		res, err = C.sub_uint8(num1, num2, &errmsg)
+	default:
+		return nil, fmt.Errorf("invalid uint type")
+	}
+
+	if err != nil {
+		return nil, errorWithMessage(err, errmsg)
+	}
+
+	return copyAndDestroyUnmanagedVector(res), nil
+}
+
+func Mul(lhs []byte, rhs []byte, uintType uint8) ([]byte, error) {
+	errmsg := uninitializedUnmanagedVector()
+
+	num1 := makeView(lhs)
+	defer runtime.KeepAlive(num1)
+
+	num2 := makeView(rhs)
+	defer runtime.KeepAlive(num2)
+
+	res := C.UnmanagedVector{}
+	var err error
+	switch uintType {
+	case 0:
+		res, err = C.mul_uint8(num1, num2, &errmsg)
+	case 1:
+		res, err = C.mul_uint8(num1, num2, &errmsg)
+	case 2:
+		res, err = C.mul_uint8(num1, num2, &errmsg)
+	default:
+		return nil, fmt.Errorf("invalid uint type")
+	}
+
+	if err != nil {
+		return nil, errorWithMessage(err, errmsg)
+	}
+
+	return copyAndDestroyUnmanagedVector(res), nil
+}
+
+func Lt(lhs []byte, rhs []byte, uintType uint8) ([]byte, error) {
+	errmsg := uninitializedUnmanagedVector()
+
+	num1 := makeView(lhs)
+	defer runtime.KeepAlive(num1)
+
+	num2 := makeView(rhs)
+	defer runtime.KeepAlive(num2)
+
+	res := C.UnmanagedVector{}
+	var err error
+	switch uintType {
+	case 0:
+		res, err = C.lt_uint8(num1, num2, &errmsg)
+	case 1:
+		res, err = C.lt_uint8(num1, num2, &errmsg)
+	case 2:
+		res, err = C.lt_uint8(num1, num2, &errmsg)
+	default:
+		return nil, fmt.Errorf("invalid uint type")
+	}
+
+	if err != nil {
+		return nil, errorWithMessage(err, errmsg)
+	}
+
+	return copyAndDestroyUnmanagedVector(res), nil
+}
+
+func Lte(lhs []byte, rhs []byte, uintType uint8) ([]byte, error) {
+	errmsg := uninitializedUnmanagedVector()
+
+	num1 := makeView(lhs)
+	defer runtime.KeepAlive(num1)
+
+	num2 := makeView(rhs)
+	defer runtime.KeepAlive(num2)
+
+	res := C.UnmanagedVector{}
+	var err error
+	switch uintType {
+	case 0:
+		res, err = C.lte_uint8(num1, num2, &errmsg)
+	case 1:
+		res, err = C.lte_uint8(num1, num2, &errmsg)
+	case 2:
+		res, err = C.lte_uint8(num1, num2, &errmsg)
+	default:
+		return nil, fmt.Errorf("invalid uint type")
+	}
+
+	if err != nil {
+		return nil, errorWithMessage(err, errmsg)
+	}
+
+	return copyAndDestroyUnmanagedVector(res), nil
+}
+
 func DeserializeServerKey(serverKeyBytes []byte) (bool, error) {
 
 	sks := makeView(serverKeyBytes)
@@ -69,6 +219,8 @@ func Encrypt(value big.Int, intType FheUintType) ([]byte, error) {
 
 	return copyAndDestroyUnmanagedVector(res), nil
 }
+
+//func Add()
 
 //func (ct *TfheCiphertext) encrypt(value big.Int, t FheUintType) {
 

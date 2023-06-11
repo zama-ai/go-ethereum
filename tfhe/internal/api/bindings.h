@@ -158,13 +158,33 @@ bool deserialize_client_key(struct ByteSliceView key, struct UnmanagedVector *er
 
 struct UnmanagedVector client_key_encrypt_fhe_uint8(uint64_t msg, struct UnmanagedVector *err_msg);
 
+struct UnmanagedVector add_uint8(struct ByteSliceView lhs,
+                                 struct ByteSliceView rhs,
+                                 struct UnmanagedVector *err_msg);
+
+struct UnmanagedVector sub_uint8(struct ByteSliceView lhs,
+                                 struct ByteSliceView rhs,
+                                 struct UnmanagedVector *err_msg);
+
+struct UnmanagedVector mul_uint8(struct ByteSliceView lhs,
+                                 struct ByteSliceView rhs,
+                                 struct UnmanagedVector *err_msg);
+
+struct UnmanagedVector lt_uint8(struct ByteSliceView lhs,
+                                struct ByteSliceView rhs,
+                                struct UnmanagedVector *err_msg);
+
+struct UnmanagedVector lte_uint8(struct ByteSliceView lhs,
+                                 struct ByteSliceView rhs,
+                                 struct UnmanagedVector *err_msg);
+
+struct UnmanagedVector new_unmanaged_vector(bool nil, const uint8_t *ptr, uintptr_t length);
+
+void destroy_unmanaged_vector(struct UnmanagedVector v);
+
 /**
  * Returns a version number of this library as a C string.
  *
  * The string is owned by the lib and must not be mutated or destroyed by the caller.
  */
 const char *version_str(void);
-
-struct UnmanagedVector new_unmanaged_vector(bool nil, const uint8_t *ptr, uintptr_t length);
-
-void destroy_unmanaged_vector(struct UnmanagedVector v);

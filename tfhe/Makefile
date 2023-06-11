@@ -1,9 +1,9 @@
 .PHONY: all build build-rust build-go test
 
 # Builds the Rust library libtfhe_wrapper
-BUILDERS_PREFIX := cosmwasm/go-ext-builder:0015
+BUILDERS_PREFIX := ghcr.io/scrtlabs/tfhe-builder
 # Contains a full Go dev environment in order to run Go tests on the built library
-ALPINE_TESTER := cosmwasm/go-ext-builder:0015-alpine
+ALPINE_TESTER := ghcr.io/scrtlabs/tfhe-builder-alpine:0.0.1
 
 USER_ID := $(shell id -u)
 USER_GROUP = $(shell id -g)
@@ -68,9 +68,10 @@ test-safety:
 release-build-alpine:
 	rm -rf libtfhe-wrapper/target/release
 	# build the muslc *.a file
-	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd)/libtfhe-wrapper:/code $(BUILDERS_PREFIX)-alpine
+	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd)/libtfhe-wrapper:/code $(BUILDERS_PREFIX)-alpine:0.0.1
 	cp libtfhe-wrapper/artifacts/libtfhe_wrapper_muslc.a internal/api
 	cp libtfhe-wrapper/artifacts/libtfhe_wrapper_muslc.aarch64.a internal/api
+	rustup target add aarch64-unknown-linux-musl
 	make update-bindings
 
 # Creates a release build in a containerized build environment of the shared library for glibc Linux (.so)
@@ -101,7 +102,7 @@ release-build-macos-static:
 release-build-windows:
 	rm -rf libtfhe_wrapper/target/release
 	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd)/libtfhe-wrapper:/code $(BUILDERS_PREFIX)-cross build_windows.sh
-	cp libtfhe_wrapper/target/x86_64-pc-windows-gnu/release/wasmvm.dll internal/api
+	cp libtfhe_wrapper/target/x86_64-pc-windows-gnu/release/tfhe_wrapper.dll internal/api
 	make update-bindings
 
 update-bindings:
@@ -116,27 +117,27 @@ release-build:
 	make release-build-macos
 	make release-build-windows
 
+build-static-muslc:
+# See "2. If you really need CGO, but not netcgo" in https://dubo-dubon-duponey.medium.com/a-beginners-guide-to-cross-compiling-static-cgo-pie-binaries-golang-1-16-792eea92d5aa
+# See also https://github.com/rust-lang/rust/issues/78919 for why we need -Wl,-z,muldefs
+	go build -ldflags "-linkmode=external -extldflags '-Wl,-z,muldefs -static'" -tags muslc \
+	  -o ./main ./cmd/
+
 test-alpine: release-build-alpine
 # try running go tests using this lib with muslc
-	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) go build -tags muslc ./...
+	# docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) go build -tags muslc ./...
 # Use package list mode to include all subdirectores. The -count=1 turns off caching.
-	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) go test -tags muslc -count=1 ./...
+	# docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) go test -tags muslc -count=1 ./...
 
 	@# Build a Go demo binary called ./demo that links the static library from the previous step.
 	@# Whether the result is a statically linked or dynamically linked binary is decided by `go build`
 	@# and it's a bit unclear how this is decided. We use `file` to see what we got.
-	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) ./build_demo.sh
-	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) file ./demo
+	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) make build-static-muslc
+	docker run --rm -u $(USER_ID):$(USER_GROUP) -v $(shell pwd):/mnt/testrun -w /mnt/testrun $(ALPINE_TESTER) file ./main
 
 	@# Run the demo binary on Alpine machines
 	@# See https://de.wikipedia.org/wiki/Alpine_Linux#Versionen for supported versions
-	docker run --rm --read-only -v $(shell pwd):/mnt/testrun -w /mnt/testrun alpine:3.15 ./demo ./testdata/hackatom.wasm
-	docker run --rm --read-only -v $(shell pwd):/mnt/testrun -w /mnt/testrun alpine:3.14 ./demo ./testdata/hackatom.wasm
-	docker run --rm --read-only -v $(shell pwd):/mnt/testrun -w /mnt/testrun alpine:3.13 ./demo ./testdata/hackatom.wasm
-	docker run --rm --read-only -v $(shell pwd):/mnt/testrun -w /mnt/testrun alpine:3.12 ./demo ./testdata/hackatom.wasm
-
-	@# Run binary locally if you are on Linux
-	@# ./demo ./testdata/hackatom.wasm
+	docker run --rm --read-only -v $(shell pwd):/mnt/testrun -w /mnt/testrun alpine:3.15 ./main version
 
 .PHONY: format
 format:
