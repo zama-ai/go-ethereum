@@ -39,6 +39,13 @@ void* deserialize_client_key(BufferView in) {
 	return cks;
 }
 
+void* deserialize_compact_public_key(BufferView in) {
+	CompactPublicKey* pks = NULL;
+	const int r = compact_public_key_deserialize(in, &pks);
+	assert(r == 0);
+	return pks;
+}
+
 void checked_set_server_key(void *sks) {
 	const int r = set_server_key(sks);
 	assert(r == 0);
@@ -58,6 +65,31 @@ void* deserialize_fhe_uint8(BufferView in) {
 	return ct;
 }
 
+void* deserialize_compact_fhe_uint8(BufferView in) {
+	CompactFheUint8List* list = NULL;
+	FheUint8* ct = NULL;
+
+	int r = compact_fhe_uint8_list_deserialize(in, &list);
+	if(r != 0) {
+		return NULL;
+	}
+	size_t len = 0;
+	r = compact_fhe_uint8_list_len(list, &len);
+	// Expect only 1 ciphertext in the list.
+	if(r != 0 || len != 1) {
+		r = compact_fhe_uint8_list_destroy(list);
+		assert(r == 0);
+		return NULL;
+	}
+	r = compact_fhe_uint8_list_expand(list, &ct, 1);
+	if(r != 0) {
+		ct = NULL;
+	}
+	r = compact_fhe_uint8_list_destroy(list);
+	assert(r == 0);
+	return ct;
+}
+
 void serialize_fhe_uint16(void *ct, Buffer* out) {
 	const int r = fhe_uint16_serialize(ct, out);
 	assert(r == 0);
@@ -72,6 +104,31 @@ void* deserialize_fhe_uint16(BufferView in) {
 	return ct;
 }
 
+void* deserialize_compact_fhe_uint16(BufferView in) {
+	CompactFheUint16List* list = NULL;
+	FheUint16* ct = NULL;
+
+	int r = compact_fhe_uint16_list_deserialize(in, &list);
+	if(r != 0) {
+		return NULL;
+	}
+	size_t len = 0;
+	r = compact_fhe_uint16_list_len(list, &len);
+	// Expect only 1 ciphertext in the list.
+	if(r != 0 || len != 1) {
+		r = compact_fhe_uint16_list_destroy(list);
+		assert(r == 0);
+		return NULL;
+	}
+	r = compact_fhe_uint16_list_expand(list, &ct, 1);
+	if(r != 0) {
+		ct = NULL;
+	}
+	r = compact_fhe_uint16_list_destroy(list);
+	assert(r == 0);
+	return ct;
+}
+
 void serialize_fhe_uint32(void *ct, Buffer* out) {
 	const int r = fhe_uint32_serialize(ct, out);
 	assert(r == 0);
@@ -83,6 +140,31 @@ void* deserialize_fhe_uint32(BufferView in) {
 	if(r != 0) {
 		return NULL;
 	}
+	return ct;
+}
+
+void* deserialize_compact_fhe_uint32(BufferView in) {
+	CompactFheUint32List* list = NULL;
+	FheUint32* ct = NULL;
+
+	int r = compact_fhe_uint32_list_deserialize(in, &list);
+	if(r != 0) {
+		return NULL;
+	}
+	size_t len = 0;
+	r = compact_fhe_uint32_list_len(list, &len);
+	// Expect only 1 ciphertext in the list.
+	if(r != 0 || len != 1) {
+		r = compact_fhe_uint32_list_destroy(list);
+		assert(r == 0);
+		return NULL;
+	}
+	r = compact_fhe_uint32_list_expand(list, &ct, 1);
+	if(r != 0) {
+		ct = NULL;
+	}
+	r = compact_fhe_uint32_list_destroy(list);
+	assert(r == 0);
 	return ct;
 }
 
@@ -287,126 +369,119 @@ uint32_t decrypt_fhe_uint32(void* cks, void* ct)
 	return res;
 }
 
-void client_key_encrypt_and_ser_fhe_uint8(void* cks, uint8_t value, Buffer* out) {
+void* public_key_encrypt_fhe_uint8(void* pks, uint8_t value) {
+	CompactFheUint8List* list = NULL;
 	FheUint8* ct = NULL;
 
-	const int encrypt_ok = fhe_uint8_try_encrypt_with_client_key_u8(value, cks, &ct);
-  	assert(encrypt_ok == 0);
+	int r = compact_fhe_uint8_list_try_encrypt_with_compact_public_key_u8(&value, 1, pks, &list);
+  	assert(r == 0);
 
-	const int ser_ok = fhe_uint8_serialize(ct, out);
-	assert(ser_ok == 0);
+	r = compact_fhe_uint8_list_expand(list, &ct, 1);
+	assert(r == 0);
 
-	fhe_uint8_destroy(ct);
+	r = compact_fhe_uint8_list_destroy(list);
+	assert(r == 0);
+
+	return ct;
 }
 
-void client_key_encrypt_and_ser_fhe_uint16(void* cks, uint16_t value, Buffer* out) {
+void* public_key_encrypt_fhe_uint16(void* pks, uint16_t value) {
+	CompactFheUint16List* list = NULL;
 	FheUint16* ct = NULL;
 
-	const int encrypt_ok = fhe_uint16_try_encrypt_with_client_key_u16(value, cks, &ct);
-  	assert(encrypt_ok == 0);
+	int r = compact_fhe_uint16_list_try_encrypt_with_compact_public_key_u16(&value, 1, pks, &list);
+  	assert(r == 0);
 
-	const int ser_ok = fhe_uint16_serialize(ct, out);
-	assert(ser_ok == 0);
+	r = compact_fhe_uint16_list_expand(list, &ct, 1);
+	assert(r == 0);
 
-	fhe_uint16_destroy(ct);
+	r = compact_fhe_uint16_list_destroy(list);
+	assert(r == 0);
+
+	return ct;
 }
 
-void client_key_encrypt_and_ser_fhe_uint32(void* cks, uint32_t value, Buffer* out) {
+void* public_key_encrypt_fhe_uint32(void* pks, uint32_t value) {
+	CompactFheUint32List* list = NULL;
 	FheUint32* ct = NULL;
 
-	const int encrypt_ok = fhe_uint32_try_encrypt_with_client_key_u32(value, cks, &ct);
-  	assert(encrypt_ok == 0);
+	int r = compact_fhe_uint32_list_try_encrypt_with_compact_public_key_u32(&value, 1, pks, &list);
+  	assert(r == 0);
 
-	const int ser_ok = fhe_uint32_serialize(ct, out);
-	assert(ser_ok == 0);
+	r = compact_fhe_uint32_list_expand(list, &ct, 1);
+	assert(r == 0);
 
-	fhe_uint32_destroy(ct);
+	r = compact_fhe_uint32_list_destroy(list);
+	assert(r == 0);
+
+	return ct;
 }
 
-void* client_key_encrypt_fhe_uint8(void* cks, uint8_t value) {
+void* trivial_encrypt_fhe_uint8(void* sks, uint8_t value) {
 	FheUint8* ct = NULL;
 
-	const int r = fhe_uint8_try_encrypt_with_client_key_u8(value, cks, &ct);
+	checked_set_server_key(sks);
+
+	int r = fhe_uint8_try_encrypt_trivial_u8(value, &ct);
   	assert(r == 0);
 
 	return ct;
 }
 
-void* client_key_encrypt_fhe_uint16(void* cks, uint16_t value) {
+void* trivial_encrypt_fhe_uint16(void* sks, uint16_t value) {
 	FheUint16* ct = NULL;
 
-	const int r = fhe_uint16_try_encrypt_with_client_key_u16(value, cks, &ct);
+	checked_set_server_key(sks);
+
+	int r = fhe_uint16_try_encrypt_trivial_u16(value, &ct);
   	assert(r == 0);
 
 	return ct;
 }
 
-void* client_key_encrypt_fhe_uint32(void* cks, uint32_t value) {
+void* trivial_encrypt_fhe_uint32(void* sks, uint32_t value) {
 	FheUint32* ct = NULL;
 
-	const int r = fhe_uint32_try_encrypt_with_client_key_u32(value, cks, &ct);
+	checked_set_server_key(sks);
+
+	int r = fhe_uint32_try_encrypt_trivial_u32(value, &ct);
   	assert(r == 0);
 
 	return ct;
 }
 
-void public_key_encrypt_fhe_uint8(BufferView pks_buf, uint8_t value, Buffer* out)
-{
-	FheUint8 *ct = NULL;
-	PublicKey *pks = NULL;
+void public_key_encrypt_and_serialize_fhe_uint8_list(void* pks, uint8_t value, Buffer* out) {
+	CompactFheUint8List* list = NULL;
 
-	const int deser_ok = public_key_deserialize(pks_buf, &pks);
-	assert(deser_ok == 0);
+	int r = compact_fhe_uint8_list_try_encrypt_with_compact_public_key_u8(&value, 1, pks, &list);
+  	assert(r == 0);
 
-	const int encrypt_ok = fhe_uint8_try_encrypt_with_public_key_u8(value, pks, &ct);
-  	assert(encrypt_ok == 0);
-
-	const int ser_ok = fhe_uint8_serialize(ct, out);
-	assert(ser_ok == 0);
-
-	public_key_destroy(pks);
-	fhe_uint8_destroy(ct);
+	r = compact_fhe_uint8_list_serialize(list, out);
+	assert(r == 0);
 }
 
-void public_key_encrypt_fhe_uint16(BufferView pks_buf, uint16_t value, Buffer* out)
-{
-	FheUint16 *ct = NULL;
-	PublicKey *pks = NULL;
+void public_key_encrypt_and_serialize_fhe_uint16_list(void* pks, uint16_t value, Buffer* out) {
+	CompactFheUint16List* list = NULL;
 
-	const int deser_ok = public_key_deserialize(pks_buf, &pks);
-	assert(deser_ok == 0);
+	int r = compact_fhe_uint16_list_try_encrypt_with_compact_public_key_u16(&value, 1, pks, &list);
+  	assert(r == 0);
 
-	const int encrypt_ok = fhe_uint16_try_encrypt_with_public_key_u16(value, pks, &ct);
-  	assert(encrypt_ok == 0);
-
-	const int ser_ok = fhe_uint16_serialize(ct, out);
-	assert(ser_ok == 0);
-
-	public_key_destroy(pks);
-	fhe_uint16_destroy(ct);
+	r = compact_fhe_uint16_list_serialize(list, out);
+	assert(r == 0);
 }
 
-void public_key_encrypt_fhe_uint32(BufferView pks_buf, uint32_t value, Buffer* out)
-{
-	FheUint32 *ct = NULL;
-	PublicKey *pks = NULL;
+void public_key_encrypt_and_serialize_fhe_uint32_list(void* pks, uint32_t value, Buffer* out) {
+	CompactFheUint32List* list = NULL;
 
-	const int deser_ok = public_key_deserialize(pks_buf, &pks);
-	assert(deser_ok == 0);
+	int r = compact_fhe_uint32_list_try_encrypt_with_compact_public_key_u32(&value, 1, pks, &list);
+  	assert(r == 0);
 
-	const int encrypt_ok = fhe_uint32_try_encrypt_with_public_key_u32(value, pks, &ct);
-  	assert(encrypt_ok == 0);
-
-	const int ser_ok = fhe_uint32_serialize(ct, out);
-	assert(ser_ok == 0);
-
-	public_key_destroy(pks);
-	fhe_uint32_destroy(ct);
+	r = compact_fhe_uint32_list_serialize(list, out);
+	assert(r == 0);
 }
+
 */
 import "C"
-
-// TODO trivial encrypt
 
 import (
 	"crypto/rand"
@@ -438,11 +513,13 @@ func homeDir() string {
 	return home
 }
 
-// The TFHE ciphertext size, in bytes.
-var fheCiphertextSize map[fheUintType]uint
+// TFHE ciphertext sizes by type, in bytes.
+// Note: These sizes are for expanded (non-compacted) ciphertexts.
+var expandedFheCiphertextSize map[fheUintType]uint
 
 var sks unsafe.Pointer
 var cks unsafe.Pointer
+var pks unsafe.Pointer
 var networkKeysDir string
 var usersKeysDir string
 
@@ -460,40 +537,41 @@ func runGc() {
 }
 
 func init() {
-	fheCiphertextSize = make(map[fheUintType]uint)
-
-	fheCiphertextSize[FheUint8] = 28124
-	fheCiphertextSize[FheUint16] = 56236
-	fheCiphertextSize[FheUint32] = 112460
+	expandedFheCiphertextSize = make(map[fheUintType]uint)
 
 	go runGc()
-	
+
 	home := homeDir()
 	networkKeysDir = home + "/.evmosd/zama/keys/network-fhe-keys/"
 	usersKeysDir = home + "/.evmosd/zama/keys/users-fhe-keys/"
 
 	sksBytes, err := os.ReadFile(networkKeysDir + "sks")
 	if err != nil {
-		fmt.Print("WARNING: file sks not found.\n")
+		fmt.Println("WARNING: file sks not found.")
 		return
 	}
 	sks = C.deserialize_server_key(toBufferView(sksBytes))
 
+	expandedFheCiphertextSize[FheUint8] = uint(len(new(tfheCiphertext).trivialEncrypt(*big.NewInt(0), FheUint8).serialize()))
+	expandedFheCiphertextSize[FheUint16] = uint(len(new(tfheCiphertext).trivialEncrypt(*big.NewInt(0), FheUint16).serialize()))
+	expandedFheCiphertextSize[FheUint32] = uint(len(new(tfheCiphertext).trivialEncrypt(*big.NewInt(0), FheUint32).serialize()))
+
 	cksBytes, err := os.ReadFile(networkKeysDir + "cks")
 	if err != nil {
-		fmt.Print("WARNING: file cks not found.\n")
+		fmt.Println("WARNING: file cks not found.")
 		return
 	}
 	cks = C.deserialize_client_key(toBufferView(cksBytes))
 
-	// Cannot use trivial encryption yet as it is not exposed by tfhe-rs
-	// ct := new(tfheCiphertext)
-	// ct.trivialEncrypt(1)
-	// fheCiphertextSize = len(ct.serialize())
+	pksBytes, err := os.ReadFile(networkKeysDir + "pks")
+	if err != nil {
+		fmt.Println("WARNING: file pks not found.")
+		return
+	}
+	pks = C.deserialize_compact_public_key(toBufferView(pksBytes))
 }
 
-// Represents a TFHE ciphertext type (i.e., its bit capacity)
-
+// Represents a TFHE ciphertext type, i.e. its bit capacity.
 type fheUintType uint8
 
 const (
@@ -502,7 +580,7 @@ const (
 	FheUint32 fheUintType = 2
 )
 
-// Represents a TFHE ciphertext.
+// Represents an expanded TFHE ciphertext.
 //
 // Once a ciphertext has a value (either from deserialization, encryption or makeRandom()),
 // it must not be set another value. If that is needed, a new ciphertext must be created.
@@ -515,6 +593,7 @@ type tfheCiphertext struct {
 	fheUintType   fheUintType
 }
 
+// Deserializes a TFHE ciphertext.
 func (ct *tfheCiphertext) deserialize(in []byte, t fheUintType) error {
 	if ct.initialized() {
 		panic("cannot deserialize to an existing ciphertext")
@@ -529,7 +608,7 @@ func (ct *tfheCiphertext) deserialize(in []byte, t fheUintType) error {
 		ptr = C.deserialize_fhe_uint32(toBufferView((in)))
 	}
 	if ptr == nil {
-		return errors.New("tfhe ciphertext deserialization failed")
+		return errors.New("TFHE ciphertext deserialization failed")
 	}
 	ct.setPtr(ptr)
 	ct.fheUintType = t
@@ -537,40 +616,79 @@ func (ct *tfheCiphertext) deserialize(in []byte, t fheUintType) error {
 	return nil
 }
 
-func (ct *tfheCiphertext) encrypt(value big.Int, t fheUintType) {
+// Deserializes a compact TFHE ciphetext.
+// Note: After the compact thfe ciphertext has been serialized, subsequent calls to serialize()
+// will produce non-compact ciphertext serialziations.
+func (ct *tfheCiphertext) deserializeCompact(in []byte, t fheUintType) error {
+	if ct.initialized() {
+		panic("cannot deserialize to an existing ciphertext")
+	}
+	var ptr unsafe.Pointer
+	switch t {
+	case FheUint8:
+		ptr = C.deserialize_compact_fhe_uint8(toBufferView((in)))
+	case FheUint16:
+		ptr = C.deserialize_compact_fhe_uint16(toBufferView((in)))
+	case FheUint32:
+		ptr = C.deserialize_compact_fhe_uint32(toBufferView((in)))
+	}
+	if ptr == nil {
+		return errors.New("TFHE ciphertext deserialization failed")
+	}
+	ct.setPtr(ptr)
+	ct.fheUintType = t
+	ct.serialization = in
+	return nil
+}
+
+// Encrypts a value as a TFHE ciphertext, using the compact public FHE key.
+// The resulting ciphertext is automaticaly expanded.
+func (ct *tfheCiphertext) encrypt(value big.Int, t fheUintType) *tfheCiphertext {
 	if ct.initialized() {
 		panic("cannot encrypt to an existing ciphertext")
 	}
 
 	switch t {
 	case FheUint8:
-		ct.setPtr(C.client_key_encrypt_fhe_uint8(cks, C.uchar(value.Uint64())))
+		ct.setPtr(C.public_key_encrypt_fhe_uint8(pks, C.uint8_t(value.Uint64())))
 	case FheUint16:
-		ct.setPtr(C.client_key_encrypt_fhe_uint16(cks, C.ushort(value.Uint64())))
+		ct.setPtr(C.public_key_encrypt_fhe_uint16(pks, C.uint16_t(value.Uint64())))
 	case FheUint32:
-		ct.setPtr(C.client_key_encrypt_fhe_uint32(cks, C.uint(value.Uint64())))
+		ct.setPtr(C.public_key_encrypt_fhe_uint32(pks, C.uint32_t(value.Uint64())))
 	}
 	ct.fheUintType = t
 	ct.value = &value
+	return ct
 }
 
-func (ct *tfheCiphertext) makeRandom(t fheUintType) {
+func (ct *tfheCiphertext) trivialEncrypt(value big.Int, t fheUintType) *tfheCiphertext {
+	if ct.initialized() {
+		panic("cannot encrypt to an existing ciphertext")
+	}
+
+	switch t {
+	case FheUint8:
+		ct.setPtr(C.trivial_encrypt_fhe_uint8(sks, C.uint8_t(value.Uint64())))
+	case FheUint16:
+		ct.setPtr(C.trivial_encrypt_fhe_uint16(sks, C.uint16_t(value.Uint64())))
+	case FheUint32:
+		ct.setPtr(C.trivial_encrypt_fhe_uint32(sks, C.uint32_t(value.Uint64())))
+	}
+	ct.fheUintType = t
+	ct.value = &value
+	return ct
+}
+
+func (ct *tfheCiphertext) makeRandom(t fheUintType) *tfheCiphertext {
 	if ct.initialized() {
 		panic("cannot make an existing ciphertext random")
 	}
-	ct.serialization = make([]byte, fheCiphertextSize[t])
+	ct.serialization = make([]byte, expandedFheCiphertextSize[t])
 	rand.Read(ct.serialization)
 	ct.fheUintType = t
 	ct.random = true
+	return ct
 }
-
-// func (ct *tfheCiphertext) trivialEncrypt(value uint64) {
-// 	if ct.initialized() {
-// 		panic("cannot trivially encrypt to an existing ciphertext")
-// 	}
-// 	ct.setPtr(C.trivial_encrypt(sks, C.ulong(value)))
-// 	ct.value = &value
-// }
 
 func (ct *tfheCiphertext) serialize() []byte {
 	if !ct.initialized() {
@@ -761,32 +879,19 @@ func (ct *tfheCiphertext) initialized() bool {
 	return (ct.ptr != nil || ct.random)
 }
 
-func clientKeyEncrypt(value uint64, t fheUintType) []byte {
+// Used for testing.
+func encryptAndSerializeCompact(value uint32, fheUintType fheUintType) []byte {
 	out := &C.Buffer{}
-	switch t {
+	switch fheUintType {
 	case FheUint8:
-		C.client_key_encrypt_and_ser_fhe_uint8(cks, C.uchar(value), out)
+		C.public_key_encrypt_and_serialize_fhe_uint8_list(pks, C.uint8_t(value), out)
 	case FheUint16:
-		C.client_key_encrypt_and_ser_fhe_uint16(cks, C.ushort(value), out)
+		C.public_key_encrypt_and_serialize_fhe_uint16_list(pks, C.uint16_t(value), out)
 	case FheUint32:
-		C.client_key_encrypt_and_ser_fhe_uint32(cks, C.uint(value), out)
+		C.public_key_encrypt_and_serialize_fhe_uint32_list(pks, C.uint32_t(value), out)
 	}
-	result := C.GoBytes(unsafe.Pointer(out.pointer), C.int(out.length))
-	C.destroy_buffer(out)
-	return result
-}
 
-func publicKeyEncrypt(pks []byte, value uint64, t fheUintType) []byte {
-	out := &C.Buffer{}
-	switch t {
-	case FheUint8:
-		C.public_key_encrypt_fhe_uint8(toBufferView(pks), C.uchar(value), out)
-	case FheUint16:
-		C.public_key_encrypt_fhe_uint16(toBufferView(pks), C.ushort(value), out)
-	case FheUint32:
-		C.public_key_encrypt_fhe_uint32(toBufferView(pks), C.uint(value), out)
-	}
-	result := C.GoBytes(unsafe.Pointer(out.pointer), C.int(out.length))
+	ser := C.GoBytes(unsafe.Pointer(out.pointer), C.int(out.length))
 	C.destroy_buffer(out)
-	return result
+	return ser
 }

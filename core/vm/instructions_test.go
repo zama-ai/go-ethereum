@@ -713,7 +713,7 @@ func (c testCallerAddress) Address() common.Address {
 func newTestScopeConext() *ScopeContext {
 	c := new(ScopeContext)
 	c.Memory = NewMemory()
-	c.Memory.Resize(uint64(fheCiphertextSize[FheUint8]) * 3)
+	c.Memory.Resize(uint64(expandedFheCiphertextSize[FheUint8]) * 3)
 	c.Stack = newstack()
 	c.Contract = NewContract(testCallerAddress{}, testContractAddress{}, big.NewInt(10), 100000)
 	return c
@@ -791,8 +791,8 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	if metadata.refCount != 1 {
 		t.Fatalf("metadata.refcount of ciphertext is not 1")
 	}
-	if metadata.length != uint64(fheCiphertextSize[FheUint8]) {
-		t.Fatalf("metadata.length (%v) != ciphertext len (%v)", metadata.length, uint64(fheCiphertextSize[FheUint8]))
+	if metadata.length != uint64(expandedFheCiphertextSize[FheUint8]) {
+		t.Fatalf("metadata.length (%v) != ciphertext len (%v)", metadata.length, uint64(expandedFheCiphertextSize[FheUint8]))
 	}
 	ciphertextLocationsToCheck := (metadata.length + 32 - 1) / 32
 	startOfCiphertext := newInt(ctHash[:])

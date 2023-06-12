@@ -1441,7 +1441,7 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	}
 
 	ct := new(tfheCiphertext)
-	err := ct.deserialize(ctBytes, ctType)
+	err := ct.deserializeCompact(ctBytes, ctType)
 	if err != nil {
 		logger.Error("verifyCiphertext failed to deserialize input ciphertext",
 			"err", err,

@@ -455,6 +455,68 @@ func toPrecompileInput(hashes ...common.Hash) []byte {
 	return ret
 }
 
+func VerifyCiphertext(t *testing.T, fheUintType fheUintType) {
+	var value uint32
+	switch fheUintType {
+	case FheUint8:
+		value = 2
+	case FheUint16:
+		value = 4283
+	case FheUint32:
+		value = 1333337
+	}
+	c := &verifyCiphertext{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	compact := encryptAndSerializeCompact(value, fheUintType)
+	input := append(compact, byte(fheUintType))
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	ct := new(tfheCiphertext)
+	if err = ct.deserializeCompact(compact, fheUintType); err != nil {
+		t.Fatalf(err.Error())
+	}
+	if common.BytesToHash(out) != ct.getHash() {
+		t.Fatalf("output hash in verifyCipertext is incorrect")
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, ct.getHash())
+	if res == nil {
+		t.Fatalf("verifyCiphertext must have verified given ciphertext")
+	}
+}
+
+func VerifyCiphertextBadType(t *testing.T, actualType fheUintType, metadataType fheUintType) {
+	var value uint32
+	switch actualType {
+	case FheUint8:
+		value = 2
+	case FheUint16:
+		value = 4283
+	case FheUint32:
+		value = 1333337
+	}
+	c := &verifyCiphertext{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	compact := encryptAndSerializeCompact(value, actualType)
+	input := append(compact, byte(metadataType))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err == nil {
+		t.Fatalf("verifyCiphertext must have failed on type mismatch")
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 0 {
+		t.Fatalf("verifyCiphertext mustn't have verified given ciphertext")
+	}
+}
+
 func FheAdd(t *testing.T, fheUintType fheUintType) {
 	var lhs, rhs uint64
 	switch fheUintType {
@@ -673,6 +735,49 @@ func FheLt(t *testing.T, fheUintType fheUintType) {
 	}
 }
 
+func TestVerifyCiphertext8(t *testing.T) {
+	VerifyCiphertext(t, FheUint8)
+}
+
+func TestVerifyCiphertext16(t *testing.T) {
+	VerifyCiphertext(t, FheUint16)
+}
+
+func TestVerifyCiphertext32(t *testing.T) {
+	VerifyCiphertext(t, FheUint32)
+}
+
+// func TestVerifyCiphertext8BadType(t *testing.T) {
+// 	VerifyCiphertextBadType(t, FheUint8, FheUint16)
+// 	VerifyCiphertextBadType(t, FheUint8, FheUint32)
+// }
+
+// func TestVerifyCiphertext16BadType(t *testing.T) {
+// 	VerifyCiphertextBadType(t, FheUint16, FheUint8)
+// 	VerifyCiphertextBadType(t, FheUint16, FheUint32)
+// }
+
+// func TestVerifyCiphertext32BadType(t *testing.T) {
+// 	VerifyCiphertextBadType(t, FheUint32, FheUint8)
+// 	VerifyCiphertextBadType(t, FheUint32, FheUint16)
+// }
+
+func TestVerifyCiphertextBadCiphertext(t *testing.T) {
+	c := &verifyCiphertext{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	_, err := c.Run(state, addr, addr, make([]byte, 10), readOnly)
+	if err == nil {
+		t.Fatalf("verifyCiphertext must fail on bad ciphertext input")
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 0 {
+		t.Fatalf("verifyCiphertext mustn't have verified given ciphertext")
+	}
+}
+
 func TestFheAdd8(t *testing.T) {
 	FheAdd(t, FheUint8)
 }
@@ -732,28 +837,6 @@ func TestFheLte32(t *testing.T) {
 func TestFheLt32(t *testing.T) {
 	FheLt(t, FheUint32)
 }
-
-// func TestFheRand(t *testing.T) {
-// 	c := &fheRand{}
-// 	depth := 1
-// 	state := newTestState()
-// 	state.interpreter.evm.depth = depth
-// 	addr := common.Address{}
-// 	readOnly := false
-
-// 	out, err := c.Run(state, addr, addr, nil, readOnly)
-// 	if err != nil {
-// 		t.Fatalf(err.Error())
-// 	}
-// 	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
-// 	if res == nil {
-// 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
-// 	}
-// 	decrypted := res.ciphertext.decrypt()
-// 	if decrypted >= math.Pow(2, 3) {
-// 		t.Fatalf("invalid decrypted result")
-// 	}
-// }
 
 func TestUnknownCiphertextHandle(t *testing.T) {
 	depth := 1
