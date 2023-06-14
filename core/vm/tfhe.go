@@ -484,7 +484,6 @@ void public_key_encrypt_and_serialize_fhe_uint32_list(void* pks, uint32_t value,
 import "C"
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"math/big"
@@ -582,14 +581,13 @@ const (
 
 // Represents an expanded TFHE ciphertext.
 //
-// Once a ciphertext has a value (either from deserialization, encryption or makeRandom()),
-// it must not be set another value. If that is needed, a new ciphertext must be created.
+// Once a ciphertext has a value (i.e. from deserialization), it must not be set
+// another value. If that is needed, a new ciphertext must be created.
 type tfheCiphertext struct {
 	ptr           unsafe.Pointer
 	serialization []byte
 	hash          []byte
 	value         *big.Int
-	random        bool
 	fheUintType   fheUintType
 }
 
@@ -637,7 +635,6 @@ func (ct *tfheCiphertext) deserializeCompact(in []byte, t fheUintType) error {
 	}
 	ct.setPtr(ptr)
 	ct.fheUintType = t
-	ct.serialization = in
 	return nil
 }
 
@@ -676,17 +673,6 @@ func (ct *tfheCiphertext) trivialEncrypt(value big.Int, t fheUintType) *tfheCiph
 	}
 	ct.fheUintType = t
 	ct.value = &value
-	return ct
-}
-
-func (ct *tfheCiphertext) makeRandom(t fheUintType) *tfheCiphertext {
-	if ct.initialized() {
-		panic("cannot make an existing ciphertext random")
-	}
-	ct.serialization = make([]byte, expandedFheCiphertextSize[t])
-	rand.Read(ct.serialization)
-	ct.fheUintType = t
-	ct.random = true
 	return ct
 }
 
@@ -872,11 +858,11 @@ func (ct *tfheCiphertext) getHash() common.Hash {
 }
 
 func (ct *tfheCiphertext) availableForOps() bool {
-	return (ct.initialized() && ct.ptr != nil && !ct.random)
+	return (ct.initialized() && ct.ptr != nil)
 }
 
 func (ct *tfheCiphertext) initialized() bool {
-	return (ct.ptr != nil || ct.random)
+	return (ct.ptr != nil)
 }
 
 // Used for testing.

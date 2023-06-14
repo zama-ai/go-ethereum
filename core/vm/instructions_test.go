@@ -732,7 +732,7 @@ func TestProtectedStorageSstoreSload(t *testing.T) {
 	depth := 1
 	interpreter := newTestInterpreter()
 	interpreter.evm.depth = depth
-	ct := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8)
+	ct := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint32)
 	ctHash := ct.getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)

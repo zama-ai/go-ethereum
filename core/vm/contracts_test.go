@@ -437,8 +437,13 @@ func newTestState() *statefulPrecompileAccessibleState {
 }
 
 func verifyCiphertextInTestMemory(interpreter *EVMInterpreter, value uint64, depth int, t fheUintType) *tfheCiphertext {
+	// Simulate as if the ciphertext is compact and comes externally.
+	ser := encryptAndSerializeCompact(uint32(value), t)
 	ct := new(tfheCiphertext)
-	ct.encrypt(*new(big.Int).SetUint64(value), t)
+	err := ct.deserializeCompact(ser, t)
+	if err != nil {
+		panic(err)
+	}
 	return verifyTfheCiphertextInTestMemory(interpreter, ct, depth)
 }
 

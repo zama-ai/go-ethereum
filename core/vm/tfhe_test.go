@@ -85,6 +85,42 @@ func TfheSerializeDeserialize(t *testing.T, fheUintType fheUintType) {
 	}
 }
 
+func TfheSerializeDeserializeCompact(t *testing.T, fheUintType fheUintType) {
+	var val uint32
+	switch fheUintType {
+	case FheUint8:
+		val = 2
+	case FheUint16:
+		val = 1337
+	case FheUint32:
+		val = 1333337
+	}
+
+	ser := encryptAndSerializeCompact(val, fheUintType)
+	ct1 := new(tfheCiphertext)
+	err := ct1.deserializeCompact(ser, fheUintType)
+	if err != nil {
+		t.Fatalf("ct1 compact deserialization failed")
+	}
+	ct1Ser := ct1.serialize()
+
+	ct2 := new(tfheCiphertext)
+	err = ct2.deserialize(ct1Ser, fheUintType)
+	if err != nil {
+		t.Fatalf("ct2 deserialization failed")
+	}
+
+	ct2Ser := ct2.serialize()
+	if !bytes.Equal(ct1Ser, ct2Ser) {
+		t.Fatalf("serialization is non-deterministic")
+	}
+
+	decrypted := ct2.decrypt()
+	if uint32(decrypted.Uint64()) != val {
+		t.Fatalf("decrypted value is incorrect")
+	}
+}
+
 func TfheTrivialSerializeDeserialize(t *testing.T, fheUintType fheUintType) {
 	var val big.Int
 	switch fheUintType {
@@ -314,6 +350,18 @@ func TestTfheSerializeDeserialize16(t *testing.T) {
 
 func TestTfheSerializeDeserialize32(t *testing.T) {
 	TfheSerializeDeserialize(t, FheUint32)
+}
+
+func TestTfheSerializeDeserializeCompact8(t *testing.T) {
+	TfheSerializeDeserializeCompact(t, FheUint8)
+}
+
+func TestTfheSerializeDeserializeCompact16(t *testing.T) {
+	TfheSerializeDeserializeCompact(t, FheUint16)
+}
+
+func TestTfheSerializeDeserializeCompact32(t *testing.T) {
+	TfheSerializeDeserializeCompact(t, FheUint32)
 }
 
 func TestTfheTrivialSerializeDeserialize8(t *testing.T) {

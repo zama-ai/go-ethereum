@@ -713,10 +713,7 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
-	// Here, we assume that if the `Commit` flag is not set, no precompile would read/write an actual ciphertext
-	// from/to protected storage. Instead, all precompiles just insert random ciphertexts to memory.
-	// Therefore, if `Commit` is not set, we don't need to touch protected storage at all.
-	if interpreter.evm.Commit && newValHash != oldValHash {
+	if newValHash != oldValHash {
 		// Since the old value is no longer stored in actual contract storage, run garbage collection on protected storage.
 		garbageCollectProtectedStorage(oldValHash, protectedStorage, interpreter)
 		// If a verified ciphertext, persist to protected storage.
