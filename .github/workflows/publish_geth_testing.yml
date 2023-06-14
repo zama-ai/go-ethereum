@@ -44,7 +44,7 @@ jobs:
         working-directory: ./zbc-fhe-tool
         run: |
           mkdir -p $HOME/.evmosd/zama/keys/network-fhe-keys
-          cargo run --features tfhe/x86_64 --release -- generate-keys $HOME/.evmosd/zama/keys/network-fhe-keys
+          cargo run --features tfhe/x86_64-unix --release -- generate-keys $HOME/.evmosd/zama/keys/network-fhe-keys
 
       - name: Run tests
         working-directory: ./go-ethereum/core/vm
