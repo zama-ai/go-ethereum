@@ -11,21 +11,22 @@ jobs:
     name: Build and test go-ethereum
     runs-on: ubuntu-latest
     steps:
-      - name: Check out tfhe-rs
+      - name: Checkout TFHE-rs
         uses: actions/checkout@v3
         with:
           repository: zama-ai/tfhe-rs
           ref: 189f02b696acad96ac18e6549714d64e4031a795
           path: tfhe-rs
 
-      - name: Check out zbc-fhe-tool
+      - name: Checkout zbc-fhe-tool
         uses: actions/checkout@v3
         with:
           repository: zama-ai/zbc-fhe-tool
           ref: main
+          token: ${{ secrets.CONCRETE_ACTIONS_TOKEN }}
           path: zbc-fhe-tool
 
-      - name: Check out go-ethereum
+      - name: Checkout go-ethereum
         uses: actions/checkout@v3
         with:
           path: go-ethereum
