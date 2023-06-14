@@ -37,7 +37,7 @@ jobs:
 
       - name: Move library files
         run: |
-          mv ./tfhe-rs/target/release/tfhe.h ./go-ethereum/core/vm/
+          sudo mv ./tfhe-rs/target/release/tfhe.h /usr/include
           sudo mv ./tfhe-rs/target/release/libtfhe.so /usr/lib/
 
       - name: Generate TFHE-rs keys

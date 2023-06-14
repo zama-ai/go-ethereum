@@ -17,10 +17,10 @@
 package vm
 
 /*
-#cgo CFLAGS: -O3
+#cgo CFLAGS: -O3 -I.
 #cgo LDFLAGS: -Llib -ltfhe
 
-#include "tfhe.h"
+#include <tfhe.h>
 
 #undef NDEBUG
 #include <assert.h>
