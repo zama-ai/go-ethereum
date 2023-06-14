@@ -1446,9 +1446,11 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	}
 	ctHash := ct.getHash()
 	importCiphertext(accessibleState, ct)
-	logger.Info("verifyCiphertext success",
-		"ctHash", ctHash.Hex(),
-		"ctBytes64", hex.EncodeToString(ctBytes[:minInt(len(ctBytes), 64)]))
+	if accessibleState.Interpreter().evm.Commit {
+		logger.Info("verifyCiphertext success",
+			"ctHash", ctHash.Hex(),
+			"ctBytes64", hex.EncodeToString(ctBytes[:minInt(len(ctBytes), 64)]))
+	}
 	return ctHash.Bytes(), nil
 }
 
