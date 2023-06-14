@@ -15,15 +15,15 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: zama-ai/tfhe-rs
-          ref: 0.2.1
+          ref: 189f02b696acad96ac18e6549714d64e4031a795
           path: tfhe-rs
 
-      - name: Check out tfhe-cli
+      - name: Check out zbc-fhe-tool
         uses: actions/checkout@v3
         with:
-          repository: tremblaythibaultl/tfhe-cli
+          repository: zama-ai/zbc-fhe-tool
           ref: main
-          path: tfhe-cli
+          path: zbc-fhe-tool
 
       - name: Check out go-ethereum
         uses: actions/checkout@v3
@@ -37,17 +37,13 @@ jobs:
       - name: Move library files
         run: |
           mv ./tfhe-rs/target/release/tfhe.h ./go-ethereum/core/vm/
-          sudo mv ./tfhe-rs/target/release/libtfhe.* /usr/lib/
+          sudo mv ./tfhe-rs/target/release/libtfhe.so /usr/lib/
 
       - name: Generate TFHE-rs keys
-        working-directory: ./tfhe-cli
-        run: cargo run --release keygen bin .
-
-      - name: Move keys
+        working-directory: ./zbc-fhe-tool
         run: |
           mkdir -p $HOME/.evmosd/zama/keys/network-fhe-keys
-          mv ./tfhe-cli/client_key.bin $HOME/.evmosd/zama/keys/network-fhe-keys/cks
-          mv ./tfhe-cli/server_key.bin $HOME/.evmosd/zama/keys/network-fhe-keys/sks
+          cargo run --features tfhe/x86_64 --release -- generate-keys $HOME/.evmosd/zama/keys/network-fhe-keys
 
       - name: Run tests
         working-directory: ./go-ethereum/core/vm
