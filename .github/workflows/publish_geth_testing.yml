@@ -11,43 +11,40 @@ jobs:
     name: Build and test go-ethereum
     runs-on: ubuntu-latest
     steps:
-      - name: Check out tfhe-rs
+      - name: Checkout TFHE-rs
         uses: actions/checkout@v3
         with:
           repository: zama-ai/tfhe-rs
-          ref: 0.2.1
+          ref: 1d817c45d5234bcf33638406191b656998b30c2a
           path: tfhe-rs
 
-      - name: Check out tfhe-cli
+      - name: Checkout zbc-fhe-tool
         uses: actions/checkout@v3
         with:
-          repository: tremblaythibaultl/tfhe-cli
+          repository: zama-ai/zbc-fhe-tool
           ref: main
-          path: tfhe-cli
+          token: ${{ secrets.CONCRETE_ACTIONS_TOKEN }}
+          path: zbc-fhe-tool
 
-      - name: Check out go-ethereum
+      - name: Checkout go-ethereum
         uses: actions/checkout@v3
         with:
           path: go-ethereum
 
       - name: Build C API
         working-directory: ./tfhe-rs
-        run: make build_c_api
+        run: make build_c_api_experimental_deterministic_fft
 
       - name: Move library files
         run: |
-          mv ./tfhe-rs/target/release/tfhe.h ./go-ethereum/core/vm/
-          sudo mv ./tfhe-rs/target/release/libtfhe.* /usr/lib/
+          sudo mv ./tfhe-rs/target/release/tfhe.h /usr/include
+          sudo mv ./tfhe-rs/target/release/libtfhe.so /usr/lib/
 
       - name: Generate TFHE-rs keys
-        working-directory: ./tfhe-cli
-        run: cargo run --release keygen bin .
-
-      - name: Move keys
+        working-directory: ./zbc-fhe-tool
         run: |
           mkdir -p $HOME/.evmosd/zama/keys/network-fhe-keys
-          mv ./tfhe-cli/client_key.bin $HOME/.evmosd/zama/keys/network-fhe-keys/cks
-          mv ./tfhe-cli/server_key.bin $HOME/.evmosd/zama/keys/network-fhe-keys/sks
+          cargo run --features tfhe/x86_64-unix --release -- generate-keys -d $HOME/.evmosd/zama/keys/network-fhe-keys
 
       - name: Run tests
         working-directory: ./go-ethereum/core/vm

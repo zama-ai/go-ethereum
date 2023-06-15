@@ -1272,7 +1272,7 @@ func importCiphertext(accessibleState PrecompileAccessibleState, ct *tfheCiphert
 // Used when we want to skip FHE computation, e.g. gas estimation.
 func importRandomCiphertext(accessibleState PrecompileAccessibleState, t fheUintType) []byte {
 	ct := new(tfheCiphertext)
-	ct.makeRandom(t)
+	ct.encrypt(*big.NewInt(0), t)
 	importCiphertext(accessibleState, ct)
 	ctHash := ct.getHash()
 	return ctHash[:]
@@ -1435,13 +1435,8 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	ctBytes := input[:len(input)-1]
 	ctType := fheUintType(input[len(input)-1])
 
-	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
-	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return importRandomCiphertext(accessibleState, ctType), nil
-	}
-
 	ct := new(tfheCiphertext)
-	err := ct.deserialize(ctBytes, ctType)
+	err := ct.deserializeCompact(ctBytes, ctType)
 	if err != nil {
 		logger.Error("verifyCiphertext failed to deserialize input ciphertext",
 			"err", err,
@@ -1451,9 +1446,11 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	}
 	ctHash := ct.getHash()
 	importCiphertext(accessibleState, ct)
-	logger.Info("verifyCiphertext success",
-		"ctHash", ctHash.Hex(),
-		"ctBytes64", hex.EncodeToString(ctBytes[:minInt(len(ctBytes), 64)]))
+	if accessibleState.Interpreter().evm.Commit {
+		logger.Info("verifyCiphertext success",
+			"ctHash", ctHash.Hex(),
+			"ctBytes64", hex.EncodeToString(ctBytes[:minInt(len(ctBytes), 64)]))
+	}
 	return ctHash.Bytes(), nil
 }
 

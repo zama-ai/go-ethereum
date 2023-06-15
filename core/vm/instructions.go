@@ -620,16 +620,18 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 	if metadataInt.IsZero() {
 		// If no metadata, it means this ciphertext itself hasn't been persisted to protected storage yet. We do that as part of SSTORE.
 		metadata.refCount = 1
-		metadata.length = uint64(fheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
+		metadata.length = uint64(expandedFheCiphertextSize[verifiedCiphertext.ciphertext.fheUintType])
 		metadata.fheUintType = verifiedCiphertext.ciphertext.fheUintType
 		ciphertextSlot := newInt(val.Bytes())
 		ciphertextSlot.AddUint64(ciphertextSlot, 1)
-		logger.Info("opSstore persisting new ciphertext",
-			"protectedStorage", hex.EncodeToString(protectedStorage[:]),
-			"handle", hex.EncodeToString(val.Bytes()),
-			"type", metadata.fheUintType,
-			"len", metadata.length,
-			"ciphertextSlot", hex.EncodeToString(ciphertextSlot.Bytes()))
+		if interpreter.evm.Commit {
+			logger.Info("opSstore persisting new ciphertext",
+				"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+				"handle", hex.EncodeToString(val.Bytes()),
+				"type", metadata.fheUintType,
+				"len", metadata.length,
+				"ciphertextSlot", hex.EncodeToString(ciphertextSlot.Bytes()))
+		}
 		ctPart32 := make([]byte, 32)
 		partIdx := 0
 		ctBytes := verifiedCiphertext.ciphertext.serialize()
@@ -650,12 +652,14 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 		// If metadata exists, bump the refcount by 1.
 		metadata = *newCiphertextMetadata(interpreter.evm.StateDB.GetState(protectedStorage, val))
 		metadata.refCount++
-		logger.Info("opSstore bumping refcount of existing ciphertext",
-			"protectedStorage", hex.EncodeToString(protectedStorage[:]),
-			"handle", hex.EncodeToString(val.Bytes()),
-			"type", metadata.fheUintType,
-			"len", metadata.length,
-			"refCount", metadata.refCount)
+		if interpreter.evm.Commit {
+			logger.Info("opSstore bumping refcount of existing ciphertext",
+				"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+				"handle", hex.EncodeToString(val.Bytes()),
+				"type", metadata.fheUintType,
+				"len", metadata.length,
+				"refCount", metadata.refCount)
+		}
 	}
 	// Save the metadata in protected storage.
 	interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
@@ -669,11 +673,13 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 		logger := interpreter.evm.Logger
 		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
 		if metadata.refCount == 1 {
-			logger.Info("opSstore garbage-collecting ciphertext",
-				"protectedStorage", hex.EncodeToString(protectedStorage[:]),
-				"metadataKey", hex.EncodeToString(metadataKey[:]),
-				"type", metadata.fheUintType,
-				"len", metadata.length)
+			if interpreter.evm.Commit {
+				logger.Info("opSstore garbage-collecting ciphertext",
+					"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+					"metadataKey", hex.EncodeToString(metadataKey[:]),
+					"type", metadata.fheUintType,
+					"len", metadata.length)
+			}
 
 			// Zero the metadata key-value.
 			interpreter.evm.StateDB.SetState(protectedStorage, metadataKey, zero)
@@ -692,11 +698,13 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 				slot.AddUint64(slot, 1)
 			}
 		} else if metadata.refCount > 1 {
-			logger.Info("opSstore decrementing ciphertext refCount",
-				"protectedStorage", hex.EncodeToString(protectedStorage[:]),
-				"metadataKey", hex.EncodeToString(metadataKey[:]),
-				"type", metadata.fheUintType,
-				"len", metadata.length)
+			if interpreter.evm.Commit {
+				logger.Info("opSstore decrementing ciphertext refCount",
+					"protectedStorage", hex.EncodeToString(protectedStorage[:]),
+					"metadataKey", hex.EncodeToString(metadataKey[:]),
+					"type", metadata.fheUintType,
+					"len", metadata.length)
+			}
 			metadata.refCount--
 			interpreter.evm.StateDB.SetState(protectedStorage, existingMetadataHash, metadata.serialize())
 		}
@@ -713,10 +721,7 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
-	// Here, we assume that if the `Commit` flag is not set, no precompile would read/write an actual ciphertext
-	// from/to protected storage. Instead, all precompiles just insert random ciphertexts to memory.
-	// Therefore, if `Commit` is not set, we don't need to touch protected storage at all.
-	if interpreter.evm.Commit && newValHash != oldValHash {
+	if newValHash != oldValHash {
 		// Since the old value is no longer stored in actual contract storage, run garbage collection on protected storage.
 		garbageCollectProtectedStorage(oldValHash, protectedStorage, interpreter)
 		// If a verified ciphertext, persist to protected storage.
