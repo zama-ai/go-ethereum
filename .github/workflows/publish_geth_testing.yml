@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: zama-ai/tfhe-rs
-          ref: 189f02b696acad96ac18e6549714d64e4031a795
+          ref: 1d817c45d5234bcf33638406191b656998b30c2a
           path: tfhe-rs
 
       - name: Checkout zbc-fhe-tool
@@ -33,7 +33,7 @@ jobs:
 
       - name: Build C API
         working-directory: ./tfhe-rs
-        run: make build_c_api
+        run: make build_c_api_experimental_deterministic_fft
 
       - name: Move library files
         run: |
@@ -44,7 +44,7 @@ jobs:
         working-directory: ./zbc-fhe-tool
         run: |
           mkdir -p $HOME/.evmosd/zama/keys/network-fhe-keys
-          cargo run --features tfhe/x86_64-unix --release -- generate-keys $HOME/.evmosd/zama/keys/network-fhe-keys
+          cargo run --features tfhe/x86_64-unix --release -- generate-keys -d $HOME/.evmosd/zama/keys/network-fhe-keys
 
       - name: Run tests
         working-directory: ./go-ethereum/core/vm
