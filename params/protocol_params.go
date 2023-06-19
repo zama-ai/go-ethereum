@@ -197,14 +197,16 @@ const (
 	// TODO: The values here are chosen somewhat arbitrarily (at least the 8 bit ones). Also, we don't
 	// take into account whether a ciphertext existed (either "current" or "original") for the given handle.
 	// Finally, costs are likely to change in the future.
-	FheUint8ProtectedStorageSstore  uint64 = NetSstoreInitGas * 3
-	FheUint16ProtectedStorageSstore uint64 = FheUint8ProtectedStorageSstore * 2
-	FheUint32ProtectedStorageSstore uint64 = FheUint16ProtectedStorageSstore * 4
+	FheUint8ProtectedStorageSstoreGas  uint64 = NetSstoreInitGas * 3
+	FheUint16ProtectedStorageSstoreGas uint64 = FheUint8ProtectedStorageSstoreGas * 2
+	FheUint32ProtectedStorageSstoreGas uint64 = FheUint16ProtectedStorageSstoreGas * 4
 
 	// TODO: We don't take whether the slot is cold or warm into consideration.
-	FheUint8ProtectedStorageSload  uint64 = ColdSloadCostEIP2929 * 3
-	FheUint16ProtectedStorageSload uint64 = FheUint8ProtectedStorageSload * 2
-	FheUint32ProtectedStorageSload uint64 = FheUint16ProtectedStorageSload * 4
+	FheUint8ProtectedStorageSloadGas  uint64 = ColdSloadCostEIP2929 * 3
+	FheUint16ProtectedStorageSloadGas uint64 = FheUint8ProtectedStorageSloadGas * 2
+	FheUint32ProtectedStorageSloadGas uint64 = FheUint16ProtectedStorageSloadGas * 4
+
+	FhePubKeyGas uint64 = 2
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations

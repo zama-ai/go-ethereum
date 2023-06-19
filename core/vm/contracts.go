@@ -69,7 +69,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	// slot 68 is available for use
+	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -97,7 +97,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	// slot 68 is available for use
+	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -126,7 +126,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	// slot 68 is available for use
+	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -155,7 +155,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	// slot 68 is available for use
+	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -184,7 +184,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{65}): &fheAdd{},
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
-	// slot 68 is available for use
+	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLte{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
@@ -1474,7 +1474,7 @@ func (e *reencrypt) RequiredGas(accessibleState PrecompileAccessibleState, input
 		logger.Error("reencrypt RequiredGas() input len must be 64 bytes", "input", hex.EncodeToString(input), "len", len(input))
 		return 0
 	}
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct == nil {
 		logger.Error("reencrypt RequiredGas() input doesn't point to verified ciphertext", "input", hex.EncodeToString(input))
 		return 0
@@ -2038,4 +2038,20 @@ func (e *faucet) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	accessibleState.Interpreter().evm.Logger.Info("faucet called", "callerAddr", caller)
 	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(1000000000000000000))
 	return input, nil
+}
+
+type fhePubKey struct{}
+
+func (e *fhePubKey) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	return params.FhePubKeyGas
+}
+
+func (e *fhePubKey) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	existing := accessibleState.Interpreter().evm.StateDB.GetState(fhePubKeyHashPrecompile, fhePubKeyHashSlot)
+	if existing != pksHash {
+		msg := "fhePubKey FHE public key hash doesn't match one stored in state"
+		accessibleState.Interpreter().evm.Logger.Error(msg, "existing", existing.Hex(), "pksHash", pksHash.Hex())
+		return nil, errors.New(msg)
+	}
+	return toEVMBytes(pksBytes), nil
 }

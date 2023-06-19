@@ -26,15 +26,15 @@ import (
 )
 
 var gasProtectedStorageSstore = map[fheUintType]uint64{
-	FheUint8:  params.FheUint8ProtectedStorageSstore,
-	FheUint16: params.FheUint16ProtectedStorageSstore,
-	FheUint32: params.FheUint32ProtectedStorageSstore,
+	FheUint8:  params.FheUint8ProtectedStorageSstoreGas,
+	FheUint16: params.FheUint16ProtectedStorageSstoreGas,
+	FheUint32: params.FheUint32ProtectedStorageSstoreGas,
 }
 
 var gasProtectedStorageSload = map[fheUintType]uint64{
-	FheUint8:  params.FheUint8ProtectedStorageSload,
-	FheUint16: params.FheUint16ProtectedStorageSload,
-	FheUint32: params.FheUint32ProtectedStorageSload,
+	FheUint8:  params.FheUint8ProtectedStorageSloadGas,
+	FheUint16: params.FheUint16ProtectedStorageSloadGas,
+	FheUint32: params.FheUint32ProtectedStorageSloadGas,
 }
 
 func makeGasSStoreFunc(clearingRefund uint64) gasFunc {

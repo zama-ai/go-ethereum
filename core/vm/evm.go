@@ -534,6 +534,16 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	return ret, address, contract.Gas, err
 }
 
+var fhePubKeyHashPrecompile = common.BytesToAddress([]byte{68})
+var fhePubKeyHashSlot = common.Hash{}
+
+func (evm *EVM) persistFhePubKeyHash() {
+	existing := evm.StateDB.GetState(fhePubKeyHashPrecompile, fhePubKeyHashSlot)
+	if newInt(existing[:]).IsZero() {
+		evm.StateDB.SetState(fhePubKeyHashPrecompile, fhePubKeyHashSlot, pksHash)
+	}
+}
+
 // Create creates a new contract using code as deployment code.
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	nonce := evm.StateDB.GetNonce(caller.Address())
@@ -549,6 +559,9 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 	// Return the actual contract's return value and contract address.
 	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, leftOverGas, big.NewInt(0), protectedStorageContractAddr, CREATE)
+	if err == nil {
+		evm.persistFhePubKeyHash()
+	}
 	return
 }
 
@@ -571,6 +584,9 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 	// Return the actual contract's return value and contract address.
 	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, endowment, protectedStorageContractAddr, CREATE2)
+	if err == nil {
+		evm.persistFhePubKeyHash()
+	}
 	return
 }
 
