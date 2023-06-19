@@ -519,6 +519,8 @@ var expandedFheCiphertextSize map[fheUintType]uint
 var sks unsafe.Pointer
 var cks unsafe.Pointer
 var pks unsafe.Pointer
+var pksBytes []byte
+var pksHash common.Hash
 var networkKeysDir string
 var usersKeysDir string
 
@@ -562,11 +564,13 @@ func init() {
 	}
 	cks = C.deserialize_client_key(toBufferView(cksBytes))
 
-	pksBytes, err := os.ReadFile(networkKeysDir + "pks")
+	pksBytes, err = os.ReadFile(networkKeysDir + "pks")
 	if err != nil {
+		pksBytes = nil
 		fmt.Println("WARNING: file pks not found.")
 		return
 	}
+	pksHash = crypto.Keccak256Hash(pksBytes)
 	pks = C.deserialize_compact_public_key(toBufferView(pksBytes))
 }
 
