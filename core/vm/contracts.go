@@ -1650,16 +1650,16 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
-	// If we are not committing to state, assume the require is true, avoiding any side effects
-	// (i.e. mutatiting the oracle DB).
-	if !accessibleState.Interpreter().evm.Commit {
-		return nil, nil
-	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct == nil {
 		msg := "require unverified handle"
 		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input))
 		return nil, errors.New(msg)
+	}
+	// If we are not committing to state, assume the require is true, avoiding any side effects
+	// (i.e. mutatiting the oracle DB).
+	if !accessibleState.Interpreter().evm.Commit {
+		return nil, nil
 	}
 	if !evaluateRequire(ct.ciphertext, accessibleState.Interpreter()) {
 		accessibleState.Interpreter().evm.Logger.Error("require failed to evaluate, reverting")
@@ -1705,16 +1705,16 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		msg := "optimisticRequire unverified handle"
+		logger.Error(msg, "input", hex.EncodeToString(input))
+		return nil, errors.New(msg)
+	}
 	// If we are not committing to state, assume the require is true, avoiding any side effects
 	// (i.e. mutatiting the oracle DB).
 	if !accessibleState.Interpreter().evm.Commit {
 		return nil, nil
-	}
-	ct, ok := accessibleState.Interpreter().verifiedCiphertexts[common.BytesToHash(input)]
-	if !ok {
-		msg := "optimisticRequire unverified handle"
-		logger.Error(msg, "input", hex.EncodeToString(input))
-		return nil, errors.New(msg)
 	}
 	if ct.ciphertext.fheUintType != FheUint32 {
 		msg := "optimisticRequire ciphertext type is not FheUint32"
