@@ -783,6 +783,18 @@ func TestVerifyCiphertext32(t *testing.T) {
 	VerifyCiphertext(t, FheUint32)
 }
 
+func TestTrivialEncrypt8(t *testing.T) {
+	TrivialEncrypt(t, FheUint32)
+}
+
+func TestTrivialEncrypt16(t *testing.T) {
+	TrivialEncrypt(t, FheUint32)
+}
+
+func TestTrivialEncrypt32(t *testing.T) {
+	TrivialEncrypt(t, FheUint32)
+}
+
 // func TestVerifyCiphertext8BadType(t *testing.T) {
 // 	VerifyCiphertextBadType(t, FheUint8, FheUint16)
 // 	VerifyCiphertextBadType(t, FheUint8, FheUint32)
