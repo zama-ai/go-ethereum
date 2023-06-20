@@ -207,6 +207,10 @@ const (
 	FheUint32ProtectedStorageSloadGas uint64 = FheUint16ProtectedStorageSloadGas * 4
 
 	FhePubKeyGas uint64 = 2
+
+	FheUint8TrivialEncryptGas  uint64 = 100
+	FheUint16TrivialEncryptGas uint64 = 200
+	FheUint32TrivialEncryptGas uint64 = 400
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations
