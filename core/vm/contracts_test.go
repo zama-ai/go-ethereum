@@ -538,7 +538,8 @@ func TrivialEncrypt(t *testing.T, fheUintType fheUintType) {
 	state.interpreter.evm.depth = depth
 	addr := common.Address{}
 	readOnly := false
-	input := append(value.Bytes(), byte(fheUintType))
+	valueBytes := make([]byte, 32)
+	input := append(value.FillBytes(valueBytes), byte(fheUintType))
 	out, err := c.Run(state, addr, addr, input, readOnly)
 	if err != nil {
 		t.Fatalf(err.Error())
