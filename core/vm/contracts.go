@@ -2087,7 +2087,7 @@ func (e *trivialEncrypt) Run(accessibleState PrecompileAccessibleState, caller c
 		return nil, errors.New(msg)
 	}
 
-	valueToEncrypt := *big.NewInt(int64(binary.BigEndian.Uint64(input[0:32])))
+	valueToEncrypt := *new(big.Int).SetBytes(input[0:32])
 	encryptToType := fheUintType(input[32])
 
 	ct := new(tfheCiphertext).trivialEncrypt(valueToEncrypt, encryptToType)

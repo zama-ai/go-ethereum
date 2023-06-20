@@ -785,11 +785,11 @@ func TestVerifyCiphertext32(t *testing.T) {
 }
 
 func TestTrivialEncrypt8(t *testing.T) {
-	TrivialEncrypt(t, FheUint32)
+	TrivialEncrypt(t, FheUint8)
 }
 
 func TestTrivialEncrypt16(t *testing.T) {
-	TrivialEncrypt(t, FheUint32)
+	TrivialEncrypt(t, FheUint16)
 }
 
 func TestTrivialEncrypt32(t *testing.T) {
