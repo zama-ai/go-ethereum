@@ -106,8 +106,8 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -136,8 +136,8 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -166,8 +166,8 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -196,8 +196,8 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
