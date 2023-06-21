@@ -78,6 +78,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -106,6 +107,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -135,6 +137,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -164,6 +167,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -193,6 +197,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1330,6 +1335,12 @@ var fheRequireGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32RequireGas,
 }
 
+var fheTrivialEncryptGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8TrivialEncryptGas,
+	FheUint16: params.FheUint16TrivialEncryptGas,
+	FheUint32: params.FheUint32TrivialEncryptGas,
+}
+
 type fheAdd struct{}
 
 func (e *fheAdd) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
@@ -2054,4 +2065,39 @@ func (e *fhePubKey) Run(accessibleState PrecompileAccessibleState, caller common
 		return nil, errors.New(msg)
 	}
 	return toEVMBytes(pksBytes), nil
+}
+
+type trivialEncrypt struct{}
+
+func (e *trivialEncrypt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) != 33 {
+		logger.Error("trivialEncrypt RequiredGas() input len must be 33 bytes", "input", hex.EncodeToString(input), "len", len(input))
+		return 0
+	}
+	encryptToType := fheUintType(input[32])
+	return fheTrivialEncryptGasCosts[encryptToType]
+}
+
+func (e *trivialEncrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) != 33 {
+		msg := "trivialEncrypt input len must be 33 bytes"
+		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
+		return nil, errors.New(msg)
+	}
+
+	valueToEncrypt := *new(big.Int).SetBytes(input[0:32])
+	encryptToType := fheUintType(input[32])
+
+	ct := new(tfheCiphertext).trivialEncrypt(valueToEncrypt, encryptToType)
+
+	ctHash := ct.getHash()
+	importCiphertext(accessibleState, ct)
+	if accessibleState.Interpreter().evm.Commit {
+		logger.Info("trivialEncrypt success",
+			"ctHash", ctHash.Hex(),
+			"valueToEncrypt", valueToEncrypt.Uint64())
+	}
+	return ctHash.Bytes(), nil
 }

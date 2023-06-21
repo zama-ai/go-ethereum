@@ -522,6 +522,38 @@ func VerifyCiphertextBadType(t *testing.T, actualType fheUintType, metadataType 
 	}
 }
 
+func TrivialEncrypt(t *testing.T, fheUintType fheUintType) {
+	var value big.Int
+	switch fheUintType {
+	case FheUint8:
+		value = *big.NewInt(2)
+	case FheUint16:
+		value = *big.NewInt(4283)
+	case FheUint32:
+		value = *big.NewInt(1333337)
+	}
+	c := &trivialEncrypt{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	valueBytes := make([]byte, 32)
+	input := append(value.FillBytes(valueBytes), byte(fheUintType))
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	ct := new(tfheCiphertext).trivialEncrypt(value, fheUintType)
+	if common.BytesToHash(out) != ct.getHash() {
+		t.Fatalf("output hash in verifyCipertext is incorrect")
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, ct.getHash())
+	if res == nil {
+		t.Fatalf("verifyCiphertext must have verified given ciphertext")
+	}
+}
+
 func FheAdd(t *testing.T, fheUintType fheUintType) {
 	var lhs, rhs uint64
 	switch fheUintType {
@@ -750,6 +782,18 @@ func TestVerifyCiphertext16(t *testing.T) {
 
 func TestVerifyCiphertext32(t *testing.T) {
 	VerifyCiphertext(t, FheUint32)
+}
+
+func TestTrivialEncrypt8(t *testing.T) {
+	TrivialEncrypt(t, FheUint8)
+}
+
+func TestTrivialEncrypt16(t *testing.T) {
+	TrivialEncrypt(t, FheUint16)
+}
+
+func TestTrivialEncrypt32(t *testing.T) {
+	TrivialEncrypt(t, FheUint32)
 }
 
 // func TestVerifyCiphertext8BadType(t *testing.T) {
