@@ -77,7 +77,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -106,7 +106,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -136,7 +136,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -166,7 +166,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -196,7 +196,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{73}): &fheLt{},
 	// common.BytesToAddress([]byte{74}): &fheRand{},
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
-	// common.BytesToAddress([]byte{76}): &cast{},
+	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -1438,7 +1438,7 @@ func (e *verifyCiphertext) RequiredGas(accessibleState PrecompileAccessibleState
 func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	logger := accessibleState.Interpreter().evm.Logger
 	if len(input) <= 1 {
-		msg := "verifyCiphertext RequiredGas() input needs to contain a ciphertext and one byte for its type"
+		msg := "verifyCiphertext Run() input needs to contain a ciphertext and one byte for its type"
 		logger.Error(msg, "len", len(input))
 		return nil, errors.New(msg)
 	}
@@ -2026,18 +2026,51 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 // 	return ctHash[:], nil
 // }
 
-// type cast struct{}
+type cast struct{}
 
-// func (e *cast) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
-// 	return 0
-// }
+func (e *cast) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	if len(input) != 33 {
+		accessibleState.Interpreter().evm.Logger.Error(
+			"cast RequiredGas() input needs to contain a ciphertext and one byte for its type",
+			"len", len(input))
+		return 0
+	}
+	return params.FheCastGas
+}
 
-// // Implementation of the following is pending and will be completed once TFHE-rs add type casts to their high-level C API.
-// func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-// 	// var ctHandle = common.BytesToHash(input[0:31])
-// 	// var toType = input[32]
-// 	return nil, nil
-// }
+// Implementation of the following is pending and will be completed once TFHE-rs add type casts to their high-level C API.
+func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) != 33 {
+		msg := "cast Run() input needs to contain a ciphertext and one byte for its type"
+		logger.Error(msg, "len", len(input))
+		return nil, errors.New(msg)
+	}
+
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if ct == nil {
+		return nil, errors.New("unverified ciphertext handle")
+	}
+	castToType := fheUintType(input[32])
+
+	res, err := ct.ciphertext.castTo(castToType)
+	if err != nil {
+		msg := "cast Run() error casting ciphertext to"
+		logger.Error(msg, "type", castToType)
+		return nil, errors.New(msg)
+	}
+
+	resHash := res.getHash()
+
+	importCiphertext(accessibleState, res)
+	if accessibleState.Interpreter().evm.Commit {
+		logger.Info("cast success",
+			"ctHash", resHash.Hex(),
+		)
+	}
+
+	return resHash.Bytes(), nil
+}
 
 type faucet struct{}
 

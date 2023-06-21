@@ -206,6 +206,8 @@ const (
 	FheUint16ProtectedStorageSloadGas uint64 = FheUint8ProtectedStorageSloadGas * 2
 	FheUint32ProtectedStorageSloadGas uint64 = FheUint16ProtectedStorageSloadGas * 4
 
+	FheCastGas uint64 = 100
+
 	FhePubKeyGas uint64 = 2
 
 	FheUint8TrivialEncryptGas  uint64 = 100
