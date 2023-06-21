@@ -18,6 +18,7 @@ package vm
 
 import (
 	"bytes"
+	"math"
 	"math/big"
 	"testing"
 )
@@ -301,9 +302,9 @@ func TfheLt(t *testing.T, fheUintType fheUintType) {
 		b.SetUint64(133337)
 	}
 	ctA := new(tfheCiphertext)
-	ctA.encrypt(a, FheUint8)
+	ctA.encrypt(a, fheUintType)
 	ctB := new(tfheCiphertext)
-	ctB.encrypt(b, FheUint8)
+	ctB.encrypt(b, fheUintType)
 	ctRes1, _ := ctA.lte(ctB)
 	ctRes2, _ := ctB.lte(ctA)
 	res1 := ctRes1.decrypt()
@@ -313,6 +314,44 @@ func TfheLt(t *testing.T, fheUintType fheUintType) {
 	}
 	if res2.Uint64() != 1 {
 		t.Fatalf("%d != %d", 0, res2.Uint64())
+	}
+}
+
+func TfheCast(t *testing.T, fheUintTypeFrom fheUintType, fheUintTypeTo fheUintType) {
+	var a big.Int
+	switch fheUintTypeFrom {
+	case FheUint8:
+		a.SetUint64(2)
+	case FheUint16:
+		a.SetUint64(4283)
+	case FheUint32:
+		a.SetUint64(1333337)
+	}
+
+	var modulus uint64
+	switch fheUintTypeTo {
+	case FheUint8:
+		modulus = uint64(math.Pow(2, 8))
+	case FheUint16:
+		modulus = uint64(math.Pow(2, 16))
+	case FheUint32:
+		modulus = uint64(math.Pow(2, 32))
+	}
+
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintTypeFrom)
+	ctRes, err := ctA.castTo(fheUintTypeTo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ctRes.fheUintType != fheUintTypeTo {
+		t.Fatalf("type %d != type %d", ctA.fheUintType, fheUintTypeTo)
+	}
+	res := ctRes.decrypt()
+	expected := a.Uint64() % modulus
+	if res.Uint64() != expected {
+		t.Fatalf("%d != %d", res.Uint64(), expected)
 	}
 }
 
@@ -469,4 +508,28 @@ func TestTfheLte32(t *testing.T) {
 
 func TestTfheLt32(t *testing.T) {
 	TfheLte(t, FheUint32)
+}
+
+func TestTfhe8Cast16(t *testing.T) {
+	TfheCast(t, FheUint8, FheUint16)
+}
+
+func TestTfhe8Cast32(t *testing.T) {
+	TfheCast(t, FheUint8, FheUint32)
+}
+
+func TestTfhe16Cast8(t *testing.T) {
+	TfheCast(t, FheUint16, FheUint8)
+}
+
+func TestTfhe16Cast32(t *testing.T) {
+	TfheCast(t, FheUint16, FheUint32)
+}
+
+func TestTfhe32Cast8(t *testing.T) {
+	TfheCast(t, FheUint16, FheUint8)
+}
+
+func TestTfhe32Cast16(t *testing.T) {
+	TfheCast(t, FheUint16, FheUint8)
 }

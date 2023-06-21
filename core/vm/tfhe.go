@@ -480,6 +480,66 @@ void public_key_encrypt_and_serialize_fhe_uint32_list(void* pks, uint32_t value,
 	assert(r == 0);
 }
 
+void* cast_8_16(void* ct, void* sks) {
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_cast_into_fhe_uint16(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* cast_8_32(void* ct, void* sks) {
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_cast_into_fhe_uint32(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* cast_16_8(void* ct, void* sks) {
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_cast_into_fhe_uint8(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* cast_16_32(void* ct, void* sks) {
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_cast_into_fhe_uint32(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* cast_32_8(void* ct, void* sks) {
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_cast_into_fhe_uint8(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* cast_32_16(void* ct, void* sks) {
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_cast_into_fhe_uint16(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
 */
 import "C"
 
@@ -807,6 +867,45 @@ func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	case FheUint32:
 		res.setPtr(C.lt_fhe_uint32(lhs.ptr, rhs.ptr, sks))
 	}
+	return res, nil
+}
+
+func (ct *tfheCiphertext) castTo(castToType fheUintType) (*tfheCiphertext, error) {
+	if !ct.availableForOps() {
+		panic("cannot cast a non-initialized ciphertext")
+	}
+
+	if ct.fheUintType == castToType {
+		return nil, errors.New("casting to same type is not supported")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = castToType
+
+	switch ct.fheUintType {
+	case FheUint8:
+		switch castToType {
+		case FheUint16:
+			res.setPtr(C.cast_8_16(ct.ptr, sks))
+		case FheUint32:
+			res.setPtr(C.cast_8_32(ct.ptr, sks))
+		}
+	case FheUint16:
+		switch castToType {
+		case FheUint8:
+			res.setPtr(C.cast_16_8(ct.ptr, sks))
+		case FheUint32:
+			res.setPtr(C.cast_16_32(ct.ptr, sks))
+		}
+	case FheUint32:
+		switch castToType {
+		case FheUint8:
+			res.setPtr(C.cast_32_8(ct.ptr, sks))
+		case FheUint16:
+			res.setPtr(C.cast_32_16(ct.ptr, sks))
+		}
+	}
+
 	return res, nil
 }
 
