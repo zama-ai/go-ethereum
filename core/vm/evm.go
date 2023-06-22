@@ -159,19 +159,23 @@ type EVM struct {
 
 	// The logger allows the EVM to report information during execution.
 	Logger Logger
+
+	// An integer used as a counter for unique ciphertext hashes during gas estimation.
+	nextCiphertextHashOnGasEst uint256.Int
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
 // only ever be used *once*.
 func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
 	evm := &EVM{
-		Context:     blockCtx,
-		TxContext:   txCtx,
-		StateDB:     statedb,
-		Config:      config,
-		chainConfig: chainConfig,
-		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
-		Logger:      &defaultLogger{},
+		Context:                    blockCtx,
+		TxContext:                  txCtx,
+		StateDB:                    statedb,
+		Config:                     config,
+		chainConfig:                chainConfig,
+		chainRules:                 chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil),
+		Logger:                     &defaultLogger{},
+		nextCiphertextHashOnGasEst: *uint256.NewInt(0),
 	}
 	evm.interpreter = NewEVMInterpreter(evm, config)
 	return evm

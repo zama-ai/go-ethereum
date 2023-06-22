@@ -848,7 +848,7 @@ const (
 type tfheCiphertext struct {
 	ptr           unsafe.Pointer
 	serialization []byte
-	hash          []byte
+	hash          *common.Hash
 	value         *big.Int
 	fheUintType   fheUintType
 }
@@ -1285,13 +1285,15 @@ func (ct *tfheCiphertext) setPtr(ptr unsafe.Pointer) {
 }
 
 func (ct *tfheCiphertext) getHash() common.Hash {
+	if ct.hash != nil {
+		return *ct.hash
+	}
 	if !ct.initialized() {
 		panic("cannot get hash of non-initialized ciphertext")
 	}
-	if ct.hash == nil {
-		ct.hash = crypto.Keccak256(ct.serialize())
-	}
-	return common.BytesToHash(ct.hash)
+	hash := common.BytesToHash(crypto.Keccak256(ct.serialize()))
+	ct.hash = &hash
+	return *ct.hash
 }
 
 func (ct *tfheCiphertext) availableForOps() bool {

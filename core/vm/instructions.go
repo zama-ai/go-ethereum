@@ -563,6 +563,10 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 	ct, ok := interpreter.verifiedCiphertexts[val]
 	if ok {
 		// If already existing in memory, skip storage and import the same ciphertext at the current depth.
+		//
+		// Also works for gas estimation - we don't persist anything to protected storage during gas estimation.
+		// However, ciphertexts remain in memory for the duration of the call, allowing for this lookup to find it.
+		// Note that even if a ciphertext has an empty verification depth set, it still remains in memory.
 		importCiphertextToEVM(interpreter, ct.ciphertext)
 		return
 	}
@@ -721,7 +725,8 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	newValHash := common.BytesToHash(newValBytes)
 	oldValHash := interpreter.evm.StateDB.GetState(scope.Contract.Address(), common.Hash(loc.Bytes32()))
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
-	if newValHash != oldValHash {
+	// If the value is the same or if we are not going to commit, don't do anything to protected storage.
+	if newValHash != oldValHash && interpreter.evm.Commit {
 		// Since the old value is no longer stored in actual contract storage, run garbage collection on protected storage.
 		garbageCollectProtectedStorage(oldValHash, protectedStorage, interpreter)
 		// If a verified ciphertext, persist to protected storage.
