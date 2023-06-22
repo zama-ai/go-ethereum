@@ -2049,9 +2049,15 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct == nil {
+		logger.Error("cast input not verified")
 		return nil, errors.New("unverified ciphertext handle")
 	}
+
 	castToType := fheUintType(input[32])
+	if !castToType.isValid() {
+		logger.Error("invalid type to cast to")
+		return nil, errors.New("invalid type provided")
+	}
 
 	res, err := ct.ciphertext.castTo(castToType)
 	if err != nil {
