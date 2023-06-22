@@ -160,15 +160,18 @@ const (
 	RefundQuotientEIP3529 uint64 = 5
 
 	// FHE operation costs depend on tfhe-rs performance and hardware acceleration. These values will most certainly change.
-	FheUint8AddSubGas  uint64 = 5000
-	FheUint16AddSubGas uint64 = FheUint8AddSubGas * 2
-	FheUint32AddSubGas uint64 = FheUint16AddSubGas * 4
-	FheUint8MulGas     uint64 = 9000
-	FheUint16MulGas    uint64 = FheUint8MulGas * 3
-	FheUint32MulGas    uint64 = FheUint16MulGas * 10
-	FheUint8LteGas     uint64 = 3300
-	FheUint16LteGas    uint64 = 5000
-	FheUint32LteGas    uint64 = 11000
+	FheUint8AddSubGas   uint64 = 5000
+	FheUint16AddSubGas  uint64 = FheUint8AddSubGas * 2
+	FheUint32AddSubGas  uint64 = FheUint16AddSubGas * 4
+	FheUint8MulGas      uint64 = 9000
+	FheUint16MulGas     uint64 = FheUint8MulGas * 3
+	FheUint32MulGas     uint64 = FheUint16MulGas * 10
+	FheUint8BitwiseGas  uint64 = 2000
+	FheUint16BitwiseGas uint64 = FheUint8BitwiseGas * 2
+	FheUint32BitwiseGas uint64 = FheUint8BitwiseGas * 4
+	FheUint8LteGas      uint64 = 3300
+	FheUint16LteGas     uint64 = 5000
+	FheUint32LteGas     uint64 = 11000
 
 	// TODO: Cost will depend on the complexity of doing reencryption by the oracle.
 	FheUint8ReencryptGas  uint64 = 15000

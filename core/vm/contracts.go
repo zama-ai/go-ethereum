@@ -108,6 +108,12 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
+	common.BytesToAddress([]byte{78}): &fheEq{},
+	common.BytesToAddress([]byte{79}): &fheGe{},
+	common.BytesToAddress([]byte{80}): &fheGt{},
+	common.BytesToAddress([]byte{80}): &fheBitAnd{},
+	common.BytesToAddress([]byte{80}): &fheBitOr{},
+	common.BytesToAddress([]byte{80}): &fheBitXor{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1305,6 +1311,12 @@ var fheAddSubGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32AddSubGas,
 }
 
+var fheBitwiseOpGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8BitwiseGas,
+	FheUint16: params.FheUint16BitwiseGas,
+	FheUint32: params.FheUint32BitwiseGas,
+}
+
 var fheMulGasCosts = map[fheUintType]uint64{
 	FheUint8:  params.FheUint8MulGas,
 	FheUint16: params.FheUint16MulGas,
@@ -1754,11 +1766,11 @@ type fheLte struct{}
 func (e *fheLte) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLt/Lte RequiredGas() inputs not verified", "err", err)
+		accessibleState.Interpreter().evm.Logger.Error("fheLte (comparison) RequiredGas() inputs not verified", "err", err)
 		return 0
 	}
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
-		accessibleState.Interpreter().evm.Logger.Error("fheLt/Lte RequiredGas() operand type mismatch", "lhs",
+		accessibleState.Interpreter().evm.Logger.Error("fheLte (comparison) RequiredGas() operand type mismatch", "lhs",
 			lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return 0
 	}
@@ -1900,6 +1912,290 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	ctHash := result.getHash()
 
 	return ctHash[:], nil
+}
+
+type fheBitAnd struct{}
+
+func (e *fheBitAnd) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("Bitwise op RequiredGas() inputs not verified", "err", err, "input", hex.EncodeToString(input))
+		return 0
+	}
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		logger.Error("Bitwise op RequiredGas() operand type mismatch", "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return 0
+	}
+	return fheBitwiseOpGasCosts[lhs.ciphertext.fheUintType]
+}
+
+func (e *fheBitAnd) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("fheBitAnd inputs not verified", "err", err)
+		return nil, err
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		msg := "fheBitAnd operand type mismatch"
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return nil, errors.New(msg)
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	result, err := lhs.ciphertext.bitand(rhs.ciphertext)
+	if err != nil {
+		logger.Error("fheBitAnd failed", "err", err)
+		return nil, err
+	}
+	importCiphertext(accessibleState, result)
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/bitand_result", result.serialize(), 0644)
+	if err != nil {
+		logger.Error("fheBitAnd failed to write /tmp/bitand_result", "err", err)
+		return nil, err
+	}
+
+	resultHash := result.getHash()
+	logger.Info("fheBitAnd success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
+}
+
+type fheBitOr struct{}
+
+func (e *fheBitOr) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of bitAnd, because bitwise op costs are currently the same.
+	and := fheBitAnd{}
+	return and.RequiredGas(accessibleState, input)
+}
+
+func (e *fheBitOr) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("fheBitOr inputs not verified", "err", err)
+		return nil, err
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		msg := "fheBitOr operand type mismatch"
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return nil, errors.New(msg)
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	result, err := lhs.ciphertext.bitor(rhs.ciphertext)
+	if err != nil {
+		logger.Error("fheBitOr failed", "err", err)
+		return nil, err
+	}
+	importCiphertext(accessibleState, result)
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/bitor_result", result.serialize(), 0644)
+	if err != nil {
+		logger.Error("fheBitOr failed to write /tmp/bitor_result", "err", err)
+		return nil, err
+	}
+
+	resultHash := result.getHash()
+	logger.Info("fheBitOr success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
+}
+
+type fheBitXor struct{}
+
+func (e *fheBitXor) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of bitAnd, because bitwise op costs are currently the same.
+	and := fheBitAnd{}
+	return and.RequiredGas(accessibleState, input)
+}
+
+func (e *fheBitXor) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("fheBitXor inputs not verified", "err", err)
+		return nil, err
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		msg := "fheBitXor operand type mismatch"
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return nil, errors.New(msg)
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	result, err := lhs.ciphertext.bitxor(rhs.ciphertext)
+	if err != nil {
+		logger.Error("fheBitXor failed", "err", err)
+		return nil, err
+	}
+	importCiphertext(accessibleState, result)
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/bitxor_result", result.serialize(), 0644)
+	if err != nil {
+		logger.Error("fheBitXor failed to write /tmp/bitxor_result", "err", err)
+		return nil, err
+	}
+
+	resultHash := result.getHash()
+	logger.Info("fheBitXor success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
+}
+
+type fheEq struct{}
+
+func (e *fheEq) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of lte, because comparison costs are currently the same.
+	lte := fheLte{}
+	return lte.RequiredGas(accessibleState, input)
+}
+
+func (e *fheEq) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("fheEq inputs not verified", "err", err)
+		return nil, err
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		msg := "fheEq operand type mismatch"
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return nil, errors.New(msg)
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	result, err := lhs.ciphertext.eq(rhs.ciphertext)
+	if err != nil {
+		logger.Error("fheEq failed", "err", err)
+		return nil, err
+	}
+	importCiphertext(accessibleState, result)
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/eq_result", result.serialize(), 0644)
+	if err != nil {
+		logger.Error("fheEq failed to write /tmp/eq_result", "err", err)
+		return nil, err
+	}
+
+	resultHash := result.getHash()
+	logger.Info("fheEq success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
+}
+
+type fheGe struct{}
+
+func (e *fheGe) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of lte, because comparison costs are currently the same.
+	lte := fheLte{}
+	return lte.RequiredGas(accessibleState, input)
+}
+
+func (e *fheGe) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("fheGe inputs not verified", "err", err)
+		return nil, err
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		msg := "fheGe operand type mismatch"
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return nil, errors.New(msg)
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	result, err := lhs.ciphertext.ge(rhs.ciphertext)
+	if err != nil {
+		logger.Error("fheGe failed", "err", err)
+		return nil, err
+	}
+	importCiphertext(accessibleState, result)
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/ge_result", result.serialize(), 0644)
+	if err != nil {
+		logger.Error("fheGe failed to write /tmp/ge_result", "err", err)
+		return nil, err
+	}
+
+	resultHash := result.getHash()
+	logger.Info("fheGt success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
+}
+
+type fheGt struct{}
+
+func (e *fheGt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	// Implement in terms of lte, because comparison costs are currently the same.
+	lte := fheLte{}
+	return lte.RequiredGas(accessibleState, input)
+}
+
+func (e *fheGt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+	if err != nil {
+		logger.Error("fheGt inputs not verified", "err", err)
+		return nil, err
+	}
+
+	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
+		msg := "fheGt operand type mismatch"
+		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
+		return nil, errors.New(msg)
+	}
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+	}
+
+	result, err := lhs.ciphertext.gt(rhs.ciphertext)
+	if err != nil {
+		logger.Error("fheGt failed", "err", err)
+		return nil, err
+	}
+	importCiphertext(accessibleState, result)
+
+	// TODO: for testing
+	err = os.WriteFile("/tmp/gt_result", result.serialize(), 0644)
+	if err != nil {
+		logger.Error("fheGt failed to write /tmp/gt_result", "err", err)
+		return nil, err
+	}
+
+	resultHash := result.getHash()
+	logger.Info("fheGt success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	return resultHash[:], nil
 }
 
 type fheLt struct{}
