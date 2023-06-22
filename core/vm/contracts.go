@@ -2064,7 +2064,12 @@ func (e *fhePubKey) Run(accessibleState PrecompileAccessibleState, caller common
 		accessibleState.Interpreter().evm.Logger.Error(msg, "existing", existing.Hex(), "pksHash", pksHash.Hex())
 		return nil, errors.New(msg)
 	}
-	return toEVMBytes(pksBytes), nil
+	// If we have a single byte with the value of 1, return as an EVM array. Otherwise, returh the raw bytes.
+	if len(input) == 1 && input[0] == 1 {
+		return toEVMBytes(pksBytes), nil
+	} else {
+		return pksBytes, nil
+	}
 }
 
 type trivialEncrypt struct{}
