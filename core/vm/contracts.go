@@ -111,9 +111,9 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{78}): &fheEq{},
 	common.BytesToAddress([]byte{79}): &fheGe{},
 	common.BytesToAddress([]byte{80}): &fheGt{},
-	common.BytesToAddress([]byte{80}): &fheBitAnd{},
-	common.BytesToAddress([]byte{80}): &fheBitOr{},
-	common.BytesToAddress([]byte{80}): &fheBitXor{},
+	common.BytesToAddress([]byte{81}): &fheBitAnd{},
+	common.BytesToAddress([]byte{82}): &fheBitOr{},
+	common.BytesToAddress([]byte{83}): &fheBitXor{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
