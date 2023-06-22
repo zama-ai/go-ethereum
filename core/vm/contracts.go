@@ -79,6 +79,12 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
+	common.BytesToAddress([]byte{78}): &fheEq{},
+	common.BytesToAddress([]byte{79}): &fheGe{},
+	common.BytesToAddress([]byte{80}): &fheGt{},
+	common.BytesToAddress([]byte{81}): &fheBitAnd{},
+	common.BytesToAddress([]byte{82}): &fheBitOr{},
+	common.BytesToAddress([]byte{83}): &fheBitXor{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -144,6 +150,12 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
+	common.BytesToAddress([]byte{78}): &fheEq{},
+	common.BytesToAddress([]byte{79}): &fheGe{},
+	common.BytesToAddress([]byte{80}): &fheGt{},
+	common.BytesToAddress([]byte{81}): &fheBitAnd{},
+	common.BytesToAddress([]byte{82}): &fheBitOr{},
+	common.BytesToAddress([]byte{83}): &fheBitXor{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -174,6 +186,12 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
+	common.BytesToAddress([]byte{78}): &fheEq{},
+	common.BytesToAddress([]byte{79}): &fheGe{},
+	common.BytesToAddress([]byte{80}): &fheGt{},
+	common.BytesToAddress([]byte{81}): &fheBitAnd{},
+	common.BytesToAddress([]byte{82}): &fheBitOr{},
+	common.BytesToAddress([]byte{83}): &fheBitXor{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -204,6 +222,12 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{75}): &optimisticRequire{},
 	common.BytesToAddress([]byte{76}): &cast{},
 	common.BytesToAddress([]byte{77}): &trivialEncrypt{},
+	common.BytesToAddress([]byte{78}): &fheEq{},
+	common.BytesToAddress([]byte{79}): &fheGe{},
+	common.BytesToAddress([]byte{80}): &fheGt{},
+	common.BytesToAddress([]byte{81}): &fheBitAnd{},
+	common.BytesToAddress([]byte{82}): &fheBitOr{},
+	common.BytesToAddress([]byte{83}): &fheBitXor{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
