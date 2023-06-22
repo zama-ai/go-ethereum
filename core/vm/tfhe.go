@@ -279,6 +279,204 @@ void* mul_fhe_uint32(void* ct1, void* ct2, void* sks)
 	return result;
 }
 
+void* bitand_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_bitand(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitand_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_bitand(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitand_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_bitand(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitor_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_bitor(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitor_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_bitor(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitor_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_bitor(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitxor_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_bitxor(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitxor_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_bitxor(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* bitxor_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_bitxor(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* eq_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_eq(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* eq_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_eq(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* eq_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_eq(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* ge_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_ge(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* ge_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_ge(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* ge_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_ge(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* gt_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_gt(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* gt_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_gt(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* gt_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_gt(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* le_fhe_uint8(void* ct1, void* ct2, void* sks)
 {
 	FheUint8* result = NULL;
@@ -822,6 +1020,138 @@ func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 		res.setPtr(C.mul_fhe_uint16(lhs.ptr, rhs.ptr, sks))
 	case FheUint32:
 		res.setPtr(C.mul_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) bitand(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot bitwise AND on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.bitand_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.bitand_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.bitand_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) bitor(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot bitwise OR on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.bitor_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.bitor_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.bitor_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) bitxor(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot bitwise XOR on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.bitxor_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.bitxor_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.bitxor_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) eq(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot eq on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.eq_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.eq_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.eq_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) ge(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot ge on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.ge_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.ge_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.ge_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) gt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot gt on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.gt_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.gt_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.gt_fhe_uint32(lhs.ptr, rhs.ptr, sks))
 	}
 	return res, nil
 }
