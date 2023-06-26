@@ -2373,6 +2373,10 @@ func (ct *tfheCiphertext) initialized() bool {
 	return (ct.ptr != nil)
 }
 
+func (t *fheUintType) isValid() bool {
+	return (*t <= 2)
+}
+
 // Used for testing.
 func encryptAndSerializeCompact(value uint32, fheUintType fheUintType) []byte {
 	out := &C.Buffer{}
