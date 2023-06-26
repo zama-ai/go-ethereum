@@ -148,7 +148,9 @@ func TfheTrivialSerializeDeserialize(t *testing.T, fheUintType fheUintType) {
 
 func TfheDeserializeFailure(t *testing.T, fheUintType fheUintType) {
 	ct := new(tfheCiphertext)
-	err := ct.deserialize(make([]byte, 10), fheUintType)
+	input := make([]byte, 1)
+	input[0] = 42
+	err := ct.deserialize(input, fheUintType)
 	if err == nil {
 		t.Fatalf("deserialization must have failed")
 	}
