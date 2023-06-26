@@ -1306,11 +1306,16 @@ func importCiphertext(accessibleState PrecompileAccessibleState, ct *tfheCiphert
 
 // Used when we want to skip FHE computation, e.g. gas estimation.
 func importRandomCiphertext(accessibleState PrecompileAccessibleState, t fheUintType) []byte {
+	nextCtHash := &accessibleState.Interpreter().evm.nextCiphertextHashOnGasEst
+	ctHashBytes := crypto.Keccak256(nextCtHash.Bytes())
+	handle := common.BytesToHash(ctHashBytes)
 	ct := new(tfheCiphertext)
-	ct.encrypt(*big.NewInt(0), t)
+	ct.fheUintType = t
+	ct.hash = &handle
 	importCiphertext(accessibleState, ct)
-	ctHash := ct.getHash()
-	return ctHash[:]
+	temp := nextCtHash.Clone()
+	nextCtHash.Add(temp, uint256.NewInt(1))
+	return ct.getHash().Bytes()
 }
 
 func get2VerifiedOperands(accessibleState PrecompileAccessibleState, input []byte) (lhs *verifiedCiphertext, rhs *verifiedCiphertext, err error) {
@@ -1481,6 +1486,11 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 
 	ctBytes := input[:len(input)-1]
 	ctType := fheUintType(input[len(input)-1])
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, ctType), nil
+	}
 
 	ct := new(tfheCiphertext)
 	err := ct.deserializeCompact(ctBytes, ctType)
@@ -2369,9 +2379,15 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct == nil {
+		logger.Error("cast input not verified")
 		return nil, errors.New("unverified ciphertext handle")
 	}
+
 	castToType := fheUintType(input[32])
+	if !castToType.isValid() {
+		logger.Error("invalid type to cast to")
+		return nil, errors.New("invalid type provided")
+	}
 
 	res, err := ct.ciphertext.castTo(castToType)
 	if err != nil {
@@ -2417,7 +2433,12 @@ func (e *fhePubKey) Run(accessibleState PrecompileAccessibleState, caller common
 		accessibleState.Interpreter().evm.Logger.Error(msg, "existing", existing.Hex(), "pksHash", pksHash.Hex())
 		return nil, errors.New(msg)
 	}
-	return toEVMBytes(pksBytes), nil
+	// If we have a single byte with the value of 1, return as an EVM array. Otherwise, returh the raw bytes.
+	if len(input) == 1 && input[0] == 1 {
+		return toEVMBytes(pksBytes), nil
+	} else {
+		return pksBytes, nil
+	}
 }
 
 type trivialEncrypt struct{}
