@@ -1486,7 +1486,10 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 
 	ctBytes := input[:len(input)-1]
 	ctType := fheUintType(input[len(input)-1])
-
+	if !ctType.isValid() {
+		logger.Error("invalid type to cast to")
+		return nil, errors.New("invalid type provided")
+	}
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState, ctType), nil

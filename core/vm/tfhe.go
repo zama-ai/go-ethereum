@@ -2282,6 +2282,10 @@ func (ct *tfheCiphertext) castTo(castToType fheUintType) (*tfheCiphertext, error
 		return nil, errors.New("casting to same type is not supported")
 	}
 
+	if !castToType.isValid() {
+		return nil, errors.New("invalid type to cast to")
+	}
+
 	res := new(tfheCiphertext)
 	res.fheUintType = castToType
 
