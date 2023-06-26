@@ -1306,11 +1306,16 @@ func importCiphertext(accessibleState PrecompileAccessibleState, ct *tfheCiphert
 
 // Used when we want to skip FHE computation, e.g. gas estimation.
 func importRandomCiphertext(accessibleState PrecompileAccessibleState, t fheUintType) []byte {
+	nextCtHash := &accessibleState.Interpreter().evm.nextCiphertextHashOnGasEst
+	ctHashBytes := crypto.Keccak256(nextCtHash.Bytes())
+	handle := common.BytesToHash(ctHashBytes)
 	ct := new(tfheCiphertext)
-	ct.encrypt(*big.NewInt(0), t)
+	ct.fheUintType = t
+	ct.hash = &handle
 	importCiphertext(accessibleState, ct)
-	ctHash := ct.getHash()
-	return ctHash[:]
+	temp := nextCtHash.Clone()
+	nextCtHash.Add(temp, uint256.NewInt(1))
+	return ct.getHash().Bytes()
 }
 
 func get2VerifiedOperands(accessibleState PrecompileAccessibleState, input []byte) (lhs *verifiedCiphertext, rhs *verifiedCiphertext, err error) {
@@ -1481,6 +1486,11 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 
 	ctBytes := input[:len(input)-1]
 	ctType := fheUintType(input[len(input)-1])
+
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, ctType), nil
+	}
 
 	ct := new(tfheCiphertext)
 	err := ct.deserializeCompact(ctBytes, ctType)
