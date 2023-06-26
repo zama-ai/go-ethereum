@@ -934,7 +934,7 @@ func FheLte(t *testing.T, fheUintType fheUintType) {
 		lhs = 1333337
 		rhs = 133337
 	}
-	c := &fheLte{}
+	c := &fheLe{}
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth

@@ -169,9 +169,9 @@ const (
 	FheUint8BitwiseGas  uint64 = 2000
 	FheUint16BitwiseGas uint64 = FheUint8BitwiseGas * 2
 	FheUint32BitwiseGas uint64 = FheUint8BitwiseGas * 4
-	FheUint8LteGas      uint64 = 3300
-	FheUint16LteGas     uint64 = 5000
-	FheUint32LteGas     uint64 = 11000
+	FheUint8LeGas       uint64 = 3300
+	FheUint16LeGas      uint64 = 5000
+	FheUint32LeGas      uint64 = 11000
 
 	// TODO: Cost will depend on the complexity of doing reencryption by the oracle.
 	FheUint8ReencryptGas  uint64 = 15000

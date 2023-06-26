@@ -71,7 +71,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
-	common.BytesToAddress([]byte{70}): &fheLte{},
+	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
@@ -106,7 +106,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
-	common.BytesToAddress([]byte{70}): &fheLte{},
+	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
@@ -142,7 +142,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
-	common.BytesToAddress([]byte{70}): &fheLte{},
+	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
@@ -178,7 +178,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
-	common.BytesToAddress([]byte{70}): &fheLte{},
+	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
@@ -214,7 +214,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
 	common.BytesToAddress([]byte{69}): &require{},
-	common.BytesToAddress([]byte{70}): &fheLte{},
+	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
 	common.BytesToAddress([]byte{73}): &fheLt{},
@@ -1347,10 +1347,10 @@ var fheMulGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32MulGas,
 }
 
-var fheLteGasCosts = map[fheUintType]uint64{
-	FheUint8:  params.FheUint8LteGas,
-	FheUint16: params.FheUint16LteGas,
-	FheUint32: params.FheUint32LteGas,
+var fheLeGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8LeGas,
+	FheUint16: params.FheUint16LeGas,
+	FheUint32: params.FheUint32LeGas,
 }
 
 var fheReencryptGasCosts = map[fheUintType]uint64{
@@ -1785,32 +1785,32 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 	return nil, nil
 }
 
-type fheLte struct{}
+type fheLe struct{}
 
-func (e *fheLte) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+func (e *fheLe) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("fheLte (comparison) RequiredGas() inputs not verified", "err", err)
+		accessibleState.Interpreter().evm.Logger.Error("fheLe (comparison) RequiredGas() inputs not verified", "err", err)
 		return 0
 	}
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
-		accessibleState.Interpreter().evm.Logger.Error("fheLte (comparison) RequiredGas() operand type mismatch", "lhs",
+		accessibleState.Interpreter().evm.Logger.Error("fheLe (comparison) RequiredGas() operand type mismatch", "lhs",
 			lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return 0
 	}
-	return fheLteGasCosts[lhs.ciphertext.fheUintType]
+	return fheLeGasCosts[lhs.ciphertext.fheUintType]
 }
 
-func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+func (e *fheLe) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	logger := accessibleState.Interpreter().evm.Logger
 	lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
 	if err != nil {
-		logger.Error("fheLte inputs not verified", "err", err)
+		logger.Error("fheLe inputs not verified", "err", err)
 		return nil, err
 	}
 
 	if lhs.ciphertext.fheUintType != rhs.ciphertext.fheUintType {
-		msg := "fheLte operand type mismatch"
+		msg := "fheLe operand type mismatch"
 		logger.Error(msg, "lhs", lhs.ciphertext.fheUintType, "rhs", rhs.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
@@ -1820,22 +1820,22 @@ func (e *fheLte) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
 	}
 
-	result, err := lhs.ciphertext.lte(rhs.ciphertext)
+	result, err := lhs.ciphertext.le(rhs.ciphertext)
 	if err != nil {
-		logger.Error("fheLte failed", "err", err)
+		logger.Error("fheLe failed", "err", err)
 		return nil, err
 	}
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/lte_result", result.serialize(), 0644)
+	err = os.WriteFile("/tmp/le_result", result.serialize(), 0644)
 	if err != nil {
-		logger.Error("fheAdd failed to write /tmp/lte_result", "err", err)
+		logger.Error("fheAdd failed to write /tmp/le_result", "err", err)
 		return nil, err
 	}
 
 	resultHash := result.getHash()
-	logger.Info("fheLte success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
+	logger.Info("fheLe success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
 	return resultHash[:], nil
 }
 
@@ -2087,9 +2087,9 @@ func (e *fheBitXor) Run(accessibleState PrecompileAccessibleState, caller common
 type fheEq struct{}
 
 func (e *fheEq) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
-	// Implement in terms of lte, because comparison costs are currently the same.
-	lte := fheLte{}
-	return lte.RequiredGas(accessibleState, input)
+	// Implement in terms of le, because comparison costs are currently the same.
+	le := fheLe{}
+	return le.RequiredGas(accessibleState, input)
 }
 
 func (e *fheEq) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -2133,9 +2133,9 @@ func (e *fheEq) Run(accessibleState PrecompileAccessibleState, caller common.Add
 type fheGe struct{}
 
 func (e *fheGe) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
-	// Implement in terms of lte, because comparison costs are currently the same.
-	lte := fheLte{}
-	return lte.RequiredGas(accessibleState, input)
+	// Implement in terms of le, because comparison costs are currently the same.
+	le := fheLe{}
+	return le.RequiredGas(accessibleState, input)
 }
 
 func (e *fheGe) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -2179,9 +2179,9 @@ func (e *fheGe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 type fheGt struct{}
 
 func (e *fheGt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
-	// Implement in terms of lte, because comparison costs are currently the same.
-	lte := fheLte{}
-	return lte.RequiredGas(accessibleState, input)
+	// Implement in terms of le, because comparison costs are currently the same.
+	le := fheLe{}
+	return le.RequiredGas(accessibleState, input)
 }
 
 func (e *fheGt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -2225,9 +2225,9 @@ func (e *fheGt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 type fheLt struct{}
 
 func (e *fheLt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
-	// Implement in terms of lte, because lte and lt costs are currently the same.
-	lte := fheLte{}
-	return lte.RequiredGas(accessibleState, input)
+	// Implement in terms of le, because le and lt costs are currently the same.
+	le := fheLe{}
+	return le.RequiredGas(accessibleState, input)
 }
 
 func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {

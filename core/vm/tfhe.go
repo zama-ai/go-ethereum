@@ -213,6 +213,39 @@ void* add_fhe_uint32(void* ct1, void* ct2, void* sks)
 	return result;
 }
 
+void* scalar_add_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_add(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_add_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_add(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_add_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_add(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* sub_fhe_uint8(void* ct1, void* ct2, void* sks)
 {
 	FheUint8* result = NULL;
@@ -246,6 +279,39 @@ void* sub_fhe_uint32(void* ct1, void* ct2, void* sks)
 	return result;
 }
 
+void* scalar_sub_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_sub(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_sub_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_sub(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_sub_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_sub(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* mul_fhe_uint8(void* ct1, void* ct2, void* sks)
 {
 	FheUint8* result = NULL;
@@ -275,6 +341,39 @@ void* mul_fhe_uint32(void* ct1, void* ct2, void* sks)
 	checked_set_server_key(sks);
 
 	const int r = fhe_uint32_mul(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_mul_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_mul(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_mul_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_mul(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_mul_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_mul(ct, pt, &result);
 	assert(r == 0);
 	return result;
 }
@@ -378,6 +477,138 @@ void* bitxor_fhe_uint32(void* ct1, void* ct2, void* sks)
 	return result;
 }
 
+void* shl_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_shl(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* shl_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_shl(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* shl_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_shl(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_shl_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_shl(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_shl_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_shl(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_shl_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_shl(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* shr_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_shr(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* shr_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_shr(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* shr_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_shr(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_shr_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_shr(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_shr_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_shr(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_shr_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_shr(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* eq_fhe_uint8(void* ct1, void* ct2, void* sks)
 {
 	FheUint8* result = NULL;
@@ -407,6 +638,105 @@ void* eq_fhe_uint32(void* ct1, void* ct2, void* sks)
 	checked_set_server_key(sks);
 
 	const int r = fhe_uint32_eq(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_eq_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_eq(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_eq_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_eq(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_eq_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_eq(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* ne_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_ne(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* ne_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_ne(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* ne_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_ne(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_ne_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_ne(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_ne_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_ne(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_ne_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_ne(ct, pt, &result);
 	assert(r == 0);
 	return result;
 }
@@ -444,6 +774,39 @@ void* ge_fhe_uint32(void* ct1, void* ct2, void* sks)
 	return result;
 }
 
+void* scalar_ge_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_ge(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_ge_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_ge(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_ge_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_ge(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* gt_fhe_uint8(void* ct1, void* ct2, void* sks)
 {
 	FheUint8* result = NULL;
@@ -473,6 +836,39 @@ void* gt_fhe_uint32(void* ct1, void* ct2, void* sks)
 	checked_set_server_key(sks);
 
 	const int r = fhe_uint32_gt(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_gt_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_gt(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_gt_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_gt(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_gt_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_gt(ct, pt, &result);
 	assert(r == 0);
 	return result;
 }
@@ -521,6 +917,39 @@ void* lt_fhe_uint8(void* ct1, void* ct2, void* sks)
 	return result;
 }
 
+void* scalar_le_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_le(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_le_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_le(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_le_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_le(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
 void* lt_fhe_uint16(void* ct1, void* ct2, void* sks)
 {
 	FheUint16* result = NULL;
@@ -539,6 +968,231 @@ void* lt_fhe_uint32(void* ct1, void* ct2, void* sks)
 	checked_set_server_key(sks);
 
 	const int r = fhe_uint32_lt(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_lt_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_lt(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_lt_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_lt(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_lt_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_lt(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* min_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_min(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* min_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_min(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* min_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_min(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_min_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_min(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_min_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_min(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_min_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_min(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* max_fhe_uint8(void* ct1, void* ct2, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_max(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* max_fhe_uint16(void* ct1, void* ct2, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_max(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* max_fhe_uint32(void* ct1, void* ct2, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_max(ct1, ct2, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_max_fhe_uint8(void* ct, uint8_t pt, void* sks)
+{
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_scalar_max(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_max_fhe_uint16(void* ct, uint16_t pt, void* sks)
+{
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_scalar_max(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* scalar_max_fhe_uint32(void* ct, uint32_t pt, void* sks)
+{
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_scalar_max(ct, pt, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* neg_fhe_uint8(void* ct, void* sks) {
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_neg(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* neg_fhe_uint16(void* ct, void* sks) {
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_neg(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* neg_fhe_uint32(void* ct, void* sks) {
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_neg(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* not_fhe_uint8(void* ct, void* sks) {
+	FheUint8* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint8_not(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* not_fhe_uint16(void* ct, void* sks) {
+	FheUint16* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint16_not(ct, &result);
+	assert(r == 0);
+	return result;
+}
+
+void* not_fhe_uint32(void* ct, void* sks) {
+	FheUint32* result = NULL;
+
+	checked_set_server_key(sks);
+
+	const int r = fhe_uint32_not(ct, &result);
 	assert(r == 0);
 	return result;
 }
@@ -980,6 +1634,27 @@ func (lhs *tfheCiphertext) add(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	return res, nil
 }
 
+func (lhs *tfheCiphertext) scalarAdd(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar add on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_add_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_add_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_add_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
 func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot sub on a non-initialized ciphertext")
@@ -1002,6 +1677,27 @@ func (lhs *tfheCiphertext) sub(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	return res, nil
 }
 
+func (lhs *tfheCiphertext) scalarSub(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar sub on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_sub_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_sub_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_sub_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
 func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot mul on a non-initialized ciphertext")
@@ -1020,6 +1716,27 @@ func (lhs *tfheCiphertext) mul(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 		res.setPtr(C.mul_fhe_uint16(lhs.ptr, rhs.ptr, sks))
 	case FheUint32:
 		res.setPtr(C.mul_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarMul(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar mul on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_mul_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_mul_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_mul_fhe_uint32(lhs.ptr, pt, sks))
 	}
 	return res, nil
 }
@@ -1090,6 +1807,92 @@ func (lhs *tfheCiphertext) bitxor(rhs *tfheCiphertext) (*tfheCiphertext, error) 
 	return res, nil
 }
 
+func (lhs *tfheCiphertext) shl(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot shl on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.shl_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.shl_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.shl_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarShl(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar shl on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_shl_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_shl_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_shl_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) shr(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot shr on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.shr_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.shr_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.shr_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarShr(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar shr on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_shr_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_shr_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_shr_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
 func (lhs *tfheCiphertext) eq(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot eq on a non-initialized ciphertext")
@@ -1108,6 +1911,70 @@ func (lhs *tfheCiphertext) eq(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 		res.setPtr(C.eq_fhe_uint16(lhs.ptr, rhs.ptr, sks))
 	case FheUint32:
 		res.setPtr(C.eq_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarEq(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar eq on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_eq_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_eq_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_eq_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) ne(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot ne on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.ne_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.ne_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.ne_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarNe(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar ne on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_ne_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_ne_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_ne_fhe_uint32(lhs.ptr, pt, sks))
 	}
 	return res, nil
 }
@@ -1134,6 +2001,27 @@ func (lhs *tfheCiphertext) ge(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	return res, nil
 }
 
+func (lhs *tfheCiphertext) scalarGe(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar ge on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_ge_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_ge_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_ge_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
 func (lhs *tfheCiphertext) gt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
 		panic("cannot gt on a non-initialized ciphertext")
@@ -1156,9 +2044,30 @@ func (lhs *tfheCiphertext) gt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	return res, nil
 }
 
-func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+func (lhs *tfheCiphertext) scalarGt(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar gt on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_gt_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_gt_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_gt_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) le(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 	if !lhs.availableForOps() || !rhs.availableForOps() {
-		panic("cannot lte on a non-initialized ciphertext")
+		panic("cannot le on a non-initialized ciphertext")
 	}
 
 	if lhs.fheUintType != rhs.fheUintType {
@@ -1174,6 +2083,27 @@ func (lhs *tfheCiphertext) lte(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 		res.setPtr(C.le_fhe_uint16(lhs.ptr, rhs.ptr, sks))
 	case FheUint32:
 		res.setPtr(C.le_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarLe(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar le on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_le_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_le_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_le_fhe_uint32(lhs.ptr, pt, sks))
 	}
 	return res, nil
 }
@@ -1196,6 +2126,149 @@ func (lhs *tfheCiphertext) lt(rhs *tfheCiphertext) (*tfheCiphertext, error) {
 		res.setPtr(C.lt_fhe_uint16(lhs.ptr, rhs.ptr, sks))
 	case FheUint32:
 		res.setPtr(C.lt_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarLt(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar lt on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_lt_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_lt_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_lt_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) min(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot min on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.min_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.min_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.min_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarMin(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar min on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_min_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_min_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_min_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) max(rhs *tfheCiphertext) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() || !rhs.availableForOps() {
+		panic("cannot max on a non-initialized ciphertext")
+	}
+
+	if lhs.fheUintType != rhs.fheUintType {
+		return nil, errors.New("binary operations are only well-defined for identical types")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.max_fhe_uint8(lhs.ptr, rhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.max_fhe_uint16(lhs.ptr, rhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.max_fhe_uint32(lhs.ptr, rhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) scalarMax(rhs uint64) (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot scalar max on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		pt := C.uint8_t(rhs)
+		res.setPtr(C.scalar_max_fhe_uint8(lhs.ptr, pt, sks))
+	case FheUint16:
+		pt := C.uint16_t(rhs)
+		res.setPtr(C.scalar_max_fhe_uint16(lhs.ptr, pt, sks))
+	case FheUint32:
+		pt := C.uint32_t(rhs)
+		res.setPtr(C.scalar_max_fhe_uint32(lhs.ptr, pt, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) neg() (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot neg on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.neg_fhe_uint8(lhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.neg_fhe_uint16(lhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.neg_fhe_uint32(lhs.ptr, sks))
+	}
+	return res, nil
+}
+
+func (lhs *tfheCiphertext) not() (*tfheCiphertext, error) {
+	if !lhs.availableForOps() {
+		panic("cannot not on a non-initialized ciphertext")
+	}
+
+	res := new(tfheCiphertext)
+	res.fheUintType = lhs.fheUintType
+	switch lhs.fheUintType {
+	case FheUint8:
+		res.setPtr(C.not_fhe_uint8(lhs.ptr, sks))
+	case FheUint16:
+		res.setPtr(C.not_fhe_uint16(lhs.ptr, sks))
+	case FheUint32:
+		res.setPtr(C.not_fhe_uint32(lhs.ptr, sks))
 	}
 	return res, nil
 }
