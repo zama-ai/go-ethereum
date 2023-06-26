@@ -259,6 +259,170 @@ func TfheMul(t *testing.T, fheUintType fheUintType) {
 	}
 }
 
+func TfheBitAnd(t *testing.T, fheUintType fheUintType) {
+	var a, b big.Int
+	switch fheUintType {
+	case FheUint8:
+		a.SetUint64(2)
+		b.SetUint64(1)
+	case FheUint16:
+		a.SetUint64(169)
+		b.SetUint64(5)
+	case FheUint32:
+		a.SetUint64(137)
+		b.SetInt64(17)
+	}
+	expected := a.Uint64() & b.Uint64()
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes, _ := ctA.bitand(ctB)
+	res := ctRes.decrypt()
+	if res.Uint64() != expected {
+		t.Fatalf("%d != %d", expected, res.Uint64())
+	}
+}
+
+func TfheBitOr(t *testing.T, fheUintType fheUintType) {
+	var a, b big.Int
+	switch fheUintType {
+	case FheUint8:
+		a.SetUint64(2)
+		b.SetUint64(1)
+	case FheUint16:
+		a.SetUint64(169)
+		b.SetUint64(5)
+	case FheUint32:
+		a.SetUint64(137)
+		b.SetInt64(17)
+	}
+	expected := a.Uint64() | b.Uint64()
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes, _ := ctA.bitor(ctB)
+	res := ctRes.decrypt()
+	if res.Uint64() != expected {
+		t.Fatalf("%d != %d", expected, res.Uint64())
+	}
+}
+
+func TfheBitXor(t *testing.T, fheUintType fheUintType) {
+	var a, b big.Int
+	switch fheUintType {
+	case FheUint8:
+		a.SetUint64(2)
+		b.SetUint64(1)
+	case FheUint16:
+		a.SetUint64(169)
+		b.SetUint64(5)
+	case FheUint32:
+		a.SetUint64(137)
+		b.SetInt64(17)
+	}
+	expected := a.Uint64() ^ b.Uint64()
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes, _ := ctA.bitxor(ctB)
+	res := ctRes.decrypt()
+	if res.Uint64() != expected {
+		t.Fatalf("%d != %d", expected, res.Uint64())
+	}
+}
+
+func TfheEq(t *testing.T, fheUintType fheUintType) {
+	var a, b big.Int
+	switch fheUintType {
+	case FheUint8:
+		a.SetUint64(2)
+		b.SetUint64(2)
+	case FheUint16:
+		a.SetUint64(169)
+		b.SetUint64(5)
+	case FheUint32:
+		a.SetUint64(137)
+		b.SetInt64(137)
+	}
+	var expected uint64
+	expectedBool := a.Uint64() == b.Uint64()
+	if expectedBool {
+		expected = 1
+	} else {
+		expected = 0
+	}
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes, _ := ctA.eq(ctB)
+	res := ctRes.decrypt()
+	if res.Uint64() != expected {
+		t.Fatalf("%d != %d", expected, res.Uint64())
+	}
+}
+
+func TfheGe(t *testing.T, fheUintType fheUintType) {
+	var a, b big.Int
+	switch fheUintType {
+	case FheUint8:
+		a.SetUint64(2)
+		b.SetUint64(1)
+	case FheUint16:
+		a.SetUint64(4283)
+		b.SetUint64(1337)
+	case FheUint32:
+		a.SetUint64(1333337)
+		b.SetUint64(133337)
+	}
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes1, _ := ctA.ge(ctB)
+	ctRes2, _ := ctB.ge(ctA)
+	res1 := ctRes1.decrypt()
+	res2 := ctRes2.decrypt()
+	if res1.Uint64() != 1 {
+		t.Fatalf("%d != %d", 0, res1.Uint64())
+	}
+	if res2.Uint64() != 0 {
+		t.Fatalf("%d != %d", 0, res2.Uint64())
+	}
+}
+
+func TfheGt(t *testing.T, fheUintType fheUintType) {
+	var a, b big.Int
+	switch fheUintType {
+	case FheUint8:
+		a.SetUint64(2)
+		b.SetUint64(1)
+	case FheUint16:
+		a.SetUint64(4283)
+		b.SetUint64(1337)
+	case FheUint32:
+		a.SetUint64(1333337)
+		b.SetUint64(133337)
+	}
+	ctA := new(tfheCiphertext)
+	ctA.encrypt(a, fheUintType)
+	ctB := new(tfheCiphertext)
+	ctB.encrypt(b, fheUintType)
+	ctRes1, _ := ctA.gt(ctB)
+	ctRes2, _ := ctB.gt(ctA)
+	res1 := ctRes1.decrypt()
+	res2 := ctRes2.decrypt()
+	if res1.Uint64() != 1 {
+		t.Fatalf("%d != %d", 0, res1.Uint64())
+	}
+	if res2.Uint64() != 0 {
+		t.Fatalf("%d != %d", 0, res2.Uint64())
+	}
+}
+
 func TfheLte(t *testing.T, fheUintType fheUintType) {
 	var a, b big.Int
 	switch fheUintType {
@@ -455,57 +619,129 @@ func TestTfheAdd8(t *testing.T) {
 	TfheAdd(t, FheUint8)
 }
 
-func TestTfheSub8(t *testing.T) {
-	TfheSub(t, FheUint8)
-}
-
-func TestTfheMul8(t *testing.T) {
-	TfheMul(t, FheUint8)
-}
-
-func TestTfheLte8(t *testing.T) {
-	TfheLte(t, FheUint8)
-}
-
-func TestTfheLt8(t *testing.T) {
-	TfheLte(t, FheUint8)
-}
 func TestTfheAdd16(t *testing.T) {
 	TfheAdd(t, FheUint16)
-}
-
-func TestTfheSub16(t *testing.T) {
-	TfheSub(t, FheUint16)
-}
-
-func TestTfheMul16(t *testing.T) {
-	TfheMul(t, FheUint16)
-}
-
-func TestTfheLte16(t *testing.T) {
-	TfheLte(t, FheUint16)
-}
-
-func TestTfheLt16(t *testing.T) {
-	TfheLte(t, FheUint16)
 }
 
 func TestTfheAdd32(t *testing.T) {
 	TfheAdd(t, FheUint32)
 }
 
+func TestTfheSub8(t *testing.T) {
+	TfheSub(t, FheUint8)
+}
+
+func TestTfheSub16(t *testing.T) {
+	TfheSub(t, FheUint16)
+}
+
 func TestTfheSub32(t *testing.T) {
 	TfheSub(t, FheUint32)
+}
+
+func TestTfheMul8(t *testing.T) {
+	TfheMul(t, FheUint8)
+}
+
+func TestTfheMul16(t *testing.T) {
+	TfheMul(t, FheUint16)
 }
 
 func TestTfheMul32(t *testing.T) {
 	TfheMul(t, FheUint32)
 }
 
+func TestTfheBitAnd8(t *testing.T) {
+	TfheBitAnd(t, FheUint8)
+}
+
+func TestTfheBitAnd16(t *testing.T) {
+	TfheBitAnd(t, FheUint16)
+}
+
+func TestTfheBitAnd32(t *testing.T) {
+	TfheBitAnd(t, FheUint32)
+}
+
+func TestTfheBitOr8(t *testing.T) {
+	TfheBitOr(t, FheUint8)
+}
+
+func TestTfheBitOr16(t *testing.T) {
+	TfheBitOr(t, FheUint16)
+}
+
+func TestTfheBitOr32(t *testing.T) {
+	TfheBitOr(t, FheUint32)
+}
+
+func TestTfheBitXor8(t *testing.T) {
+	TfheBitXor(t, FheUint8)
+}
+
+func TestTfheBitXor16(t *testing.T) {
+	TfheBitXor(t, FheUint16)
+}
+
+func TestTfheBitXor32(t *testing.T) {
+	TfheBitXor(t, FheUint32)
+}
+
+func TestTfheEq8(t *testing.T) {
+	TfheEq(t, FheUint8)
+}
+
+func TestTfheEq16(t *testing.T) {
+	TfheEq(t, FheUint16)
+}
+
+func TestTfheEq32(t *testing.T) {
+	TfheEq(t, FheUint32)
+}
+
+func TestTfheGe8(t *testing.T) {
+	TfheGe(t, FheUint8)
+}
+
+func TestTfheGe16(t *testing.T) {
+	TfheGe(t, FheUint16)
+}
+
+func TestTfheGe32(t *testing.T) {
+	TfheGe(t, FheUint32)
+}
+
+func TestTfheGt8(t *testing.T) {
+	TfheGt(t, FheUint8)
+}
+
+func TestTfheGt16(t *testing.T) {
+	TfheGt(t, FheUint16)
+}
+
+func TestTfheGt32(t *testing.T) {
+	TfheGt(t, FheUint32)
+}
+
+func TestTfheLte8(t *testing.T) {
+	TfheLte(t, FheUint8)
+}
+
+func TestTfheLte16(t *testing.T) {
+	TfheLte(t, FheUint16)
+}
+
 func TestTfheLte32(t *testing.T) {
 	TfheLte(t, FheUint32)
 }
 
+func TestTfheLt8(t *testing.T) {
+	TfheLte(t, FheUint8)
+}
+
+func TestTfheLt16(t *testing.T) {
+	TfheLte(t, FheUint16)
+}
 func TestTfheLt32(t *testing.T) {
 	TfheLte(t, FheUint32)
 }
