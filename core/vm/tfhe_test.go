@@ -932,13 +932,13 @@ func TfheNeg(t *testing.T, fheUintType fheUintType) {
 	switch fheUintType {
 	case FheUint8:
 		a.SetUint64(2)
-		expected = uint64(math.Pow(2, 8)) - a.Uint64()
+		expected = uint64(-uint8(a.Uint64()))
 	case FheUint16:
 		a.SetUint64(4283)
-		expected = uint64(math.Pow(2, 16)) - a.Uint64()
+		expected = uint64(-uint16(a.Uint64()))
 	case FheUint32:
 		a.SetUint64(1333337)
-		expected = uint64(math.Pow(2, 32)) - a.Uint64()
+		expected = uint64(-uint32(a.Uint64()))
 	}
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, fheUintType)
@@ -950,21 +950,18 @@ func TfheNeg(t *testing.T, fheUintType fheUintType) {
 }
 
 func TfheNot(t *testing.T, fheUintType fheUintType) {
-	var a, b big.Int
+	var a big.Int
 	var expected uint64
 	switch fheUintType {
 	case FheUint8:
 		a.SetUint64(2)
-		b.Not(&a)
-		expected = uint64(math.Pow(2, 8)) - b.Uint64()
+		expected = uint64(^uint8(a.Uint64()))
 	case FheUint16:
 		a.SetUint64(4283)
-		b.Not(&a)
-		expected = uint64(math.Pow(2, 16)) - b.Uint64()
+		expected = uint64(^uint16(a.Uint64()))
 	case FheUint32:
 		a.SetUint64(1333337)
-		b.Not(&a)
-		expected = uint64(math.Pow(2, 32)) - b.Uint64()
+		expected = uint64(^uint32(a.Uint64()))
 	}
 	ctA := new(tfheCiphertext)
 	ctA.encrypt(a, fheUintType)
