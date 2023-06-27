@@ -146,13 +146,15 @@ func TfheTrivialSerializeDeserialize(t *testing.T, fheUintType fheUintType) {
 	}
 }
 
-// func TfheDeserializeFailure(t *testing.T, fheUintType fheUintType) {
-// 	ct := new(tfheCiphertext)
-// 	err := ct.deserialize(make([]byte, 10), fheUintType)
-// 	if err == nil {
-// 		t.Fatalf("deserialization must have failed")
-// 	}
-// }
+func TfheDeserializeFailure(t *testing.T, fheUintType fheUintType) {
+	ct := new(tfheCiphertext)
+	input := make([]byte, 1)
+	input[0] = 42
+	err := ct.deserialize(input, fheUintType)
+	if err == nil {
+		t.Fatalf("deserialization must have failed")
+	}
+}
 
 func TfheDeserializeCompact(t *testing.T, fheUintType fheUintType) {
 	var val uint32
@@ -1071,18 +1073,17 @@ func TestTfheTrivialSerializeDeserialize32(t *testing.T) {
 	TfheTrivialSerializeDeserialize(t, FheUint32)
 }
 
-// Disable this test because a breaking change in TFHE-rs at tag 0.3.0-beta.0 makes this test fail.
-// func TestTfheDeserializeFailure8(t *testing.T) {
-// 	TfheDeserializeFailure(t, FheUint8)
-// }
+func TestTfheDeserializeFailure8(t *testing.T) {
+	TfheDeserializeFailure(t, FheUint8)
+}
 
-// func TestTfheDeserializeFailure16(t *testing.T) {
-// 	TfheDeserializeFailure(t, FheUint16)
-// }
+func TestTfheDeserializeFailure16(t *testing.T) {
+	TfheDeserializeFailure(t, FheUint16)
+}
 
-// func TestTfheDeserializeFailure32(t *testing.T) {
-// 	TfheDeserializeFailure(t, FheUint32)
-// }
+func TestTfheDeserializeFailure32(t *testing.T) {
+	TfheDeserializeFailure(t, FheUint32)
+}
 
 func TestTfheDeserializeCompact8(t *testing.T) {
 	TfheDeserializeCompact(t, FheUint8)
