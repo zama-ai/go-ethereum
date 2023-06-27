@@ -593,8 +593,9 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		ct := new(tfheCiphertext)
 		err := ct.deserialize(ctBytes, metadata.fheUintType)
 		if err != nil {
-			interpreter.evm.Logger.Error("opSload failed to deserialize a ciphertext, exiting process", "err", err)
-			exitProcess()
+			msg := "opSload failed to deserialize a ciphertext"
+			interpreter.evm.Logger.Error(msg, "err", err)
+			panic(msg)
 		}
 		importCiphertextToEVM(interpreter, ct)
 	}
