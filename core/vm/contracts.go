@@ -3462,7 +3462,7 @@ func (e *faucet) RequiredGas(accessibleState PrecompileAccessibleState, input []
 
 func (e *faucet) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	accessibleState.Interpreter().evm.Logger.Info("faucet called", "callerAddr", caller)
-	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(1000000000000000000))
+	accessibleState.Interpreter().evm.StateDB.AddBalance(common.BytesToAddress(input[0:20]), big.NewInt(0).Mul(big.NewInt(1000000000000000000), big.NewInt(10)))
 	return input, nil
 }
 
