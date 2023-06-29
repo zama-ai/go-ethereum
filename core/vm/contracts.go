@@ -3519,5 +3519,5 @@ func (e *trivialEncrypt) Run(accessibleState PrecompileAccessibleState, caller c
 			"ctHash", ctHash.Hex(),
 			"valueToEncrypt", valueToEncrypt.Uint64())
 	}
-	return ctHash[:], nil
+	return ctHash.Bytes(), nil
 }
