@@ -1265,10 +1265,12 @@ func init() {
 
 	f, err := os.Open(home + "/.evmosd/zama/config/zama_config.toml")
 	if err != nil {
+		fmt.Println("failed to open zama_config.toml file")
 		return
 	}
 	defer f.Close()
 	if err := toml.NewDecoder(f).Decode(&tomlConfig); err != nil {
+		fmt.Println("failed to parse zama_config.toml file: " + err.Error())
 		return
 	}
 
@@ -1276,16 +1278,19 @@ func init() {
 	case "oracle":
 		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
+			fmt.Println("failed to read private.ed25519 file: " + err.Error())
 			return
 		}
 		privateSignatureKey = priv
 	case "node":
 		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
 		if err != nil {
+			fmt.Println("failed to read public.ed25519 file: " + err.Error())
 			return
 		}
 		publicSignatureKey = pub
 	default:
+		fmt.Println("invalid oracle mode: " + mode)
 		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
 	}
 }
