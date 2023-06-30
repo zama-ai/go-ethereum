@@ -1217,11 +1217,6 @@ type tomlConfigOptions struct {
 		OracleDBAddress   string
 		RequireRetryCount uint8
 	}
-
-	Tfhe struct {
-		CiphertextsToGarbageCollect           uint64
-		CiphertextsGarbageCollectIntervalSecs uint64
-	}
 }
 
 var tomlConfig tomlConfigOptions
@@ -1270,10 +1265,12 @@ func init() {
 
 	f, err := os.Open(home + "/.evmosd/zama/config/zama_config.toml")
 	if err != nil {
+		fmt.Println("failed to open zama_config.toml file")
 		return
 	}
 	defer f.Close()
 	if err := toml.NewDecoder(f).Decode(&tomlConfig); err != nil {
+		fmt.Println("failed to parse zama_config.toml file: " + err.Error())
 		return
 	}
 
@@ -1281,16 +1278,19 @@ func init() {
 	case "oracle":
 		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
+			fmt.Println("failed to read private.ed25519 file: " + err.Error())
 			return
 		}
 		privateSignatureKey = priv
 	case "node":
 		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
 		if err != nil {
+			fmt.Println("failed to read public.ed25519 file: " + err.Error())
 			return
 		}
 		publicSignatureKey = pub
 	default:
+		fmt.Println("invalid oracle mode: " + mode)
 		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
 	}
 }
@@ -1456,6 +1456,10 @@ var fheTrivialEncryptGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32TrivialEncryptGas,
 }
 
+func writeResult(ct *tfheCiphertext, fileName string, logger Logger) {
+	os.WriteFile("/tmp/"+fileName, ct.serialize(), 0644)
+}
+
 type fheAdd struct{}
 
 func (e *fheAdd) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
@@ -1520,11 +1524,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/add_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheAdd failed to write /tmp/add_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "add_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheAdd success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -1550,11 +1550,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/add_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheAdd scalar failed to write /tmp/add_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "add_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheAdd scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -1577,10 +1573,8 @@ func encryptToUserKey(value *big.Int, pubKey []byte) ([]byte, error) {
 	}
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
-	if err != nil {
-		return nil, err
-	}
+	// Ignore file writing errors.
+	os.WriteFile("/tmp/public_encrypt_result", ct, 0644)
 
 	return ct, nil
 }
@@ -1611,11 +1605,21 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 	}
 
 	ctBytes := input[:len(input)-1]
-	ctType := fheUintType(input[len(input)-1])
-	if !ctType.isValid() {
-		logger.Error("invalid type to cast to")
-		return nil, errors.New("invalid type provided")
+	ctTypeByte := input[len(input)-1]
+	if !isValidType(ctTypeByte) {
+		msg := "verifyCiphertext Run() ciphertext type is invalid"
+		logger.Error(msg, "type", ctTypeByte)
+		return nil, errors.New(msg)
 	}
+	ctType := fheUintType(ctTypeByte)
+
+	expectedSize, found := compactFheCiphertextSize[ctType]
+	if !found || expectedSize != uint(len(ctBytes)) {
+		msg := "verifyCiphertext Run() compact ciphertext size is invalid"
+		logger.Error(msg, "type", ctTypeByte, "size", len(ctBytes), "expectedSize", expectedSize)
+		return nil, errors.New(msg)
+	}
+
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return importRandomCiphertext(accessibleState, ctType), nil
@@ -1682,7 +1686,11 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct != nil {
-		decryptedValue := ct.ciphertext.decrypt()
+		decryptedValue, err := ct.ciphertext.decrypt()
+		if err != nil {
+			logger.Error("reencrypt decryption failed", "err", err)
+			return nil, err
+		}
 		pubKey := input[32:64]
 		reencryptedValue, err := encryptToUserKey(&decryptedValue, pubKey)
 		if err != nil {
@@ -1729,16 +1737,20 @@ func requireURL(key *string) string {
 
 // Puts the given ciphertext as a require to the oracle DB or exits the process on errors.
 // Returns the require value.
-func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
+func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) (bool, error) {
 	logger := interpreter.evm.Logger
 	ciphertext := ct.serialize()
-	plaintext := ct.decrypt()
+	plaintext, err := ct.decrypt()
+	if err != nil {
+		logger.Error("putRequire decryption failed", "err", err)
+		return false, err
+	}
 	value := (plaintext.BitLen() != 0)
 	key := requireKey(ciphertext)
 	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
 	if err != nil {
 		logger.Error("putRequire JSON Marshal() failed, exiting process", "err", err, "key", key)
-		exitProcess()
+		return false, err
 	}
 	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
 		req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
@@ -1758,17 +1770,17 @@ func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
 			continue
 		}
 		logger.Info("putRequire sucess", "value", value, "key", key)
-		return value
+		return value, nil
 	}
 	logger.Error("putRequire reached maximum retries, exiting process",
 		"retries", tomlConfig.Oracle.RequireRetryCount, "key", key)
 	exitProcess()
-	return value
+	return value, nil
 }
 
 // Gets the given require from the oracle DB and returns its value.
 // Exits the process on errors or signature verification failure.
-func getRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
+func getRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) (bool, error) {
 	logger := interpreter.evm.Logger
 	ciphertext := ct.serialize()
 	key := requireKey(ciphertext)
@@ -1776,7 +1788,7 @@ func getRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
 		req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
 		if err != nil {
 			logger.Error("getRequire NewRequest() failed, retrying", "err", err)
-			continue
+			return false, err
 		}
 		resp, err := requireHttpClient.Do(req)
 		if err != nil {
@@ -1805,14 +1817,14 @@ func getRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
 			continue
 		}
 		logger.Info("getRequire success", "value", msg.Value, "key", key)
-		return msg.Value
+		return msg.Value, nil
 	}
 	logger.Error("getRequire reached maximum retries, exiting process", "retries", tomlConfig.Oracle.RequireRetryCount)
 	exitProcess()
-	return false
+	return false, nil
 }
 
-func evaluateRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
+func evaluateRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) (bool, error) {
 	mode := strings.ToLower(tomlConfig.Oracle.Mode)
 	switch mode {
 	case "oracle":
@@ -1822,7 +1834,7 @@ func evaluateRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) bool {
 	}
 	interpreter.evm.Logger.Error("evaluateRequire invalid mode", "mode", mode)
 	exitProcess()
-	return false
+	return false, nil
 }
 
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1847,8 +1859,12 @@ func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.A
 	if !accessibleState.Interpreter().evm.Commit {
 		return nil, nil
 	}
-	if !evaluateRequire(ct.ciphertext, accessibleState.Interpreter()) {
-		accessibleState.Interpreter().evm.Logger.Error("require failed to evaluate, reverting")
+	value, err := evaluateRequire(ct.ciphertext, accessibleState.Interpreter())
+	if err != nil {
+		accessibleState.Interpreter().evm.Logger.Error("require failed to evaluate, reverting", "err", err)
+		return nil, ErrExecutionReverted
+	} else if !value {
+		accessibleState.Interpreter().evm.Logger.Error("require value is false, reverting")
 		return nil, ErrExecutionReverted
 	}
 	return nil, nil
@@ -1988,11 +2004,7 @@ func (e *fheLe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/le_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheLe failed to write /tmp/le_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "le_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheLe success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2018,11 +2030,7 @@ func (e *fheLe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/le_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheLe scalar failed to write /tmp/le_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "le_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheLe scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2072,11 +2080,7 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/sub_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheSub failed to write /tmp/sub_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "sub_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheSub success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2102,11 +2106,7 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/sub_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheSub scalar failed to write /tmp/sub_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "sub_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheSub scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2178,11 +2178,7 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/mul_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheMul failed to write /tmp/mul_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "mul_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMul success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2208,11 +2204,7 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/mul_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheMul scalar failed to write /tmp/mul_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "mul_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMul scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2289,12 +2281,7 @@ func (e *fheBitAnd) Run(accessibleState PrecompileAccessibleState, caller common
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/bitand_result", result.serialize(), 0644)
-	if err != nil {
-		logger.Error("fheBitAnd failed to write /tmp/bitand_result", "err", err)
-		return nil, err
-	}
-
+	writeResult(result, "bitand_result", logger)
 	resultHash := result.getHash()
 	logger.Info("fheBitAnd success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
 	return resultHash[:], nil
@@ -2348,11 +2335,7 @@ func (e *fheBitOr) Run(accessibleState PrecompileAccessibleState, caller common.
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/bitor_result", result.serialize(), 0644)
-	if err != nil {
-		logger.Error("fheBitOr failed to write /tmp/bitor_result", "err", err)
-		return nil, err
-	}
+	writeResult(result, "bitor_result", logger)
 
 	resultHash := result.getHash()
 	logger.Info("fheBitOr success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2407,11 +2390,7 @@ func (e *fheBitXor) Run(accessibleState PrecompileAccessibleState, caller common
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/bitxor_result", result.serialize(), 0644)
-	if err != nil {
-		logger.Error("fheBitXor failed to write /tmp/bitxor_result", "err", err)
-		return nil, err
-	}
+	writeResult(result, "bitxor_result", logger)
 
 	resultHash := result.getHash()
 	logger.Info("fheBitXor success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2482,11 +2461,7 @@ func (e *fheShl) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/shl_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheShl failed to write /tmp/shl_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "shl_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheShl success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2512,11 +2487,7 @@ func (e *fheShl) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/shl_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheShl scalar failed to write /tmp/shl_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "shl_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheShl scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2566,11 +2537,7 @@ func (e *fheShr) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/shr_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheShr failed to write /tmp/shr_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "shr_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheShr success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2596,11 +2563,7 @@ func (e *fheShr) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/shr_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheShr scalar failed to write /tmp/shr_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "shr_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheShr scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2650,11 +2613,7 @@ func (e *fheEq) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/eq_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheEq failed to write /tmp/eq_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "eq_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheEq success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2680,11 +2639,7 @@ func (e *fheEq) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/eq_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheEq scalar failed to write /tmp/eq_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "eq_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheEq scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2734,11 +2689,7 @@ func (e *fheNe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/ne_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheNe failed to write /tmp/ne_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "ne_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheNe success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2764,11 +2715,7 @@ func (e *fheNe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/ne_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheNe scalar failed to write /tmp/ne_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "ne_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheNe scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2818,11 +2765,7 @@ func (e *fheGe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/ge_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheGe failed to write /tmp/ge_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "ge_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheGe success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2848,11 +2791,7 @@ func (e *fheGe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/ge_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheGe scalar failed to write /tmp/ge_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "ge_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheGe scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2902,11 +2841,7 @@ func (e *fheGt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/gt_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheGt failed to write /tmp/gt_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "gt_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheGt success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -2932,11 +2867,7 @@ func (e *fheGt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/gt_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheGt scalar failed to write /tmp/gt_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "gt_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheGt scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2986,11 +2917,7 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/lt_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheLt failed to write /tmp/lt_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "lt_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheLt success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -3016,11 +2943,7 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/lt_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheLt scalar failed to write /tmp/lt_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "lt_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheLt scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -3092,11 +3015,7 @@ func (e *fheMin) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/min_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheMin failed to write /tmp/min_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "min_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMin success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -3122,11 +3041,7 @@ func (e *fheMin) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/min_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheMin scalar failed to write /tmp/min_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "min_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMin scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -3176,11 +3091,7 @@ func (e *fheMax) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/max_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheMax failed to write /tmp/max_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "max_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMax success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -3206,11 +3117,7 @@ func (e *fheMax) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		err = os.WriteFile("/tmp/max_result", result.serialize(), 0644)
-		if err != nil {
-			logger.Error("fheMax scalar failed to write /tmp/max_result", "err", err)
-			return nil, err
-		}
+		writeResult(result, "max_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMax scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -3264,12 +3171,7 @@ func (e *fheNeg) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/neg_result", result.serialize(), 0644)
-	if err != nil {
-		logger.Error("fheNeg failed to write /tmp/neg_result", "err", err)
-		return nil, err
-	}
-
+	writeResult(result, "neg_result", logger)
 	resultHash := result.getHash()
 	logger.Info("fheNeg success", "ct", ct.ciphertext.getHash().Hex(), "result", resultHash.Hex())
 	return resultHash[:], nil
@@ -3313,11 +3215,7 @@ func (e *fheNot) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	importCiphertext(accessibleState, result)
 
 	// TODO: for testing
-	err = os.WriteFile("/tmp/not_result", result.serialize(), 0644)
-	if err != nil {
-		logger.Error("fheNot failed to write /tmp/not_result", "err", err)
-		return nil, err
-	}
+	writeResult(result, "not_result", logger)
 
 	resultHash := result.getHash()
 	logger.Info("fheNot success", "ct", ct.ciphertext.getHash().Hex(), "result", resultHash.Hex())
@@ -3429,11 +3327,11 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 		return nil, errors.New("unverified ciphertext handle")
 	}
 
-	castToType := fheUintType(input[32])
-	if !castToType.isValid() {
+	if !isValidType(input[32]) {
 		logger.Error("invalid type to cast to")
 		return nil, errors.New("invalid type provided")
 	}
+	castToType := fheUintType(input[32])
 
 	res, err := ct.ciphertext.castTo(castToType)
 	if err != nil {

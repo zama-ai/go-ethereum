@@ -597,8 +597,8 @@ func FheAdd(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
@@ -639,8 +639,8 @@ func FheSub(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
@@ -681,8 +681,8 @@ func FheMul(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
@@ -728,8 +728,8 @@ func FheBitAnd(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted := res.ciphertext.decrypt()
-		if decrypted.Uint64() != expected {
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 		}
 	}
@@ -776,8 +776,8 @@ func FheBitOr(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted := res.ciphertext.decrypt()
-		if decrypted.Uint64() != expected {
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 		}
 	}
@@ -824,8 +824,8 @@ func FheBitXor(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted := res.ciphertext.decrypt()
-		if decrypted.Uint64() != expected {
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 		}
 	}
@@ -867,8 +867,8 @@ func FheShl(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
@@ -909,8 +909,8 @@ func FheShr(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
@@ -951,8 +951,8 @@ func FheEq(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != 0 {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 0 {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 	}
 }
@@ -993,8 +993,8 @@ func FheNe(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != 1 {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 1 {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 	}
 }
@@ -1035,8 +1035,8 @@ func FheGe(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != 1 {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 1 {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 	}
 	// Inverting operands is only possible in the non scalar case as scalar
@@ -1052,8 +1052,8 @@ func FheGe(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted = res.ciphertext.decrypt()
-		if decrypted.Uint64() != 0 {
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 0 {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 		}
 	}
@@ -1096,8 +1096,8 @@ func FheGt(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != 1 {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 1 {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 	}
 
@@ -1114,8 +1114,8 @@ func FheGt(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted = res.ciphertext.decrypt()
-		if decrypted.Uint64() != 0 {
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 0 {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 		}
 	}
@@ -1158,8 +1158,8 @@ func FheLe(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != 0 {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 0 {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 	}
 
@@ -1176,8 +1176,8 @@ func FheLe(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted = res.ciphertext.decrypt()
-		if decrypted.Uint64() != 1 {
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 1 {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 		}
 	}
@@ -1221,8 +1221,8 @@ func FheLt(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != 0 {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 0 {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
 	}
 
@@ -1239,8 +1239,8 @@ func FheLt(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted = res.ciphertext.decrypt()
-		if decrypted.Uint64() != 1 {
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 1 {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
 		}
 	}
@@ -1283,8 +1283,8 @@ func FheMin(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != rhs {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != rhs {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), rhs)
 	}
 
@@ -1300,8 +1300,8 @@ func FheMin(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted = res.ciphertext.decrypt()
-		if decrypted.Uint64() != rhs {
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != rhs {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), rhs)
 		}
 	}
@@ -1344,8 +1344,8 @@ func FheMax(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != lhs {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != lhs {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), lhs)
 	}
 
@@ -1361,8 +1361,8 @@ func FheMax(t *testing.T, fheUintType fheUintType, scalar bool) {
 		if res == nil {
 			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 		}
-		decrypted = res.ciphertext.decrypt()
-		if decrypted.Uint64() != lhs {
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != lhs {
 			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), lhs)
 		}
 	}
@@ -1400,8 +1400,8 @@ func FheNeg(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
@@ -1438,9 +1438,41 @@ func FheNot(t *testing.T, fheUintType fheUintType, scalar bool) {
 	if res == nil {
 		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
 	}
-	decrypted := res.ciphertext.decrypt()
-	if decrypted.Uint64() != expected {
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func TestVerifyCiphertextInvalidType(t *testing.T) {
+	c := &verifyCiphertext{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	invalidType := fheUintType(255)
+	compact := encryptAndSerializeCompact(0, FheUint32)
+	input := append(compact, byte(invalidType))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err == nil {
+		t.Fatalf("verifyCiphertext must have failed on invalid ciphertext type")
+	}
+}
+
+func TestVerifyCiphertextInvalidSize(t *testing.T) {
+	c := &verifyCiphertext{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	ctType := FheUint32
+	compact := encryptAndSerializeCompact(0, ctType)
+	input := append(compact[:len(compact)-1], byte(ctType))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err == nil {
+		t.Fatalf("verifyCiphertext must have failed on invalid ciphertext size")
 	}
 }
 
@@ -1468,20 +1500,20 @@ func TestTrivialEncrypt32(t *testing.T) {
 	TrivialEncrypt(t, FheUint32)
 }
 
-// func TestVerifyCiphertext8BadType(t *testing.T) {
-// 	VerifyCiphertextBadType(t, FheUint8, FheUint16)
-// 	VerifyCiphertextBadType(t, FheUint8, FheUint32)
-// }
+func TestVerifyCiphertext8BadType(t *testing.T) {
+	VerifyCiphertextBadType(t, FheUint8, FheUint16)
+	VerifyCiphertextBadType(t, FheUint8, FheUint32)
+}
 
-// func TestVerifyCiphertext16BadType(t *testing.T) {
-// 	VerifyCiphertextBadType(t, FheUint16, FheUint8)
-// 	VerifyCiphertextBadType(t, FheUint16, FheUint32)
-// }
+func TestVerifyCiphertext16BadType(t *testing.T) {
+	VerifyCiphertextBadType(t, FheUint16, FheUint8)
+	VerifyCiphertextBadType(t, FheUint16, FheUint32)
+}
 
-// func TestVerifyCiphertext32BadType(t *testing.T) {
-// 	VerifyCiphertextBadType(t, FheUint32, FheUint8)
-// 	VerifyCiphertextBadType(t, FheUint32, FheUint16)
-// }
+func TestVerifyCiphertext32BadType(t *testing.T) {
+	VerifyCiphertextBadType(t, FheUint32, FheUint8)
+	VerifyCiphertextBadType(t, FheUint32, FheUint16)
+}
 
 func TestVerifyCiphertextBadCiphertext(t *testing.T) {
 	c := &verifyCiphertext{}

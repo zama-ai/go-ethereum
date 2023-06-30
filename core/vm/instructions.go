@@ -18,6 +18,7 @@ package vm
 
 import (
 	"encoding/hex"
+	"errors"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -559,7 +560,7 @@ func newInt(buf []byte) *uint256.Int {
 
 var zero = uint256.NewInt(0).Bytes32()
 
-func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, contractAddress common.Address) {
+func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, contractAddress common.Address) error {
 	ct, ok := interpreter.verifiedCiphertexts[val]
 	if ok {
 		// If already existing in memory, skip storage and import the same ciphertext at the current depth.
@@ -568,7 +569,7 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		// However, ciphertexts remain in memory for the duration of the call, allowing for this lookup to find it.
 		// Note that even if a ciphertext has an empty verification depth set, it still remains in memory.
 		importCiphertextToEVM(interpreter, ct.ciphertext)
-		return
+		return nil
 	}
 
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
@@ -593,18 +594,22 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		ct := new(tfheCiphertext)
 		err := ct.deserialize(ctBytes, metadata.fheUintType)
 		if err != nil {
-			interpreter.evm.Logger.Error("opSload failed to deserialize a ciphertext, exiting process", "err", err)
-			exitProcess()
+			msg := "opSload failed to deserialize a ciphertext"
+			interpreter.evm.Logger.Error(msg, "err", err)
+			return errors.New(msg)
 		}
 		importCiphertextToEVM(interpreter, ct)
 	}
+	return nil
 }
 
 func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	loc := scope.Stack.peek()
 	hash := common.Hash(loc.Bytes32())
 	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
-	verifyIfCiphertextHandle(val, interpreter, scope.Contract.Address())
+	if err := verifyIfCiphertextHandle(val, interpreter, scope.Contract.Address()); err != nil {
+		return nil, err
+	}
 	loc.SetBytes(val.Bytes())
 	return nil, nil
 }

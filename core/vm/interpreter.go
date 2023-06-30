@@ -295,7 +295,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// is an optimistic require, check its decrypted value. If false, return as if
 		// execution is to be reverted.
 		if in.evm.depth == 1 && in.optimisticRequire != nil {
-			if !evaluateRequire(in.optimisticRequire, in) {
+			if value, evalError := evaluateRequire(in.optimisticRequire, in); evalError != nil || !value {
 				err = ErrExecutionReverted
 			}
 		}
