@@ -1550,7 +1550,7 @@ func (e *fheAdd) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "add_result", logger)
+		writeResult(result, "add_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheAdd scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2030,7 +2030,7 @@ func (e *fheLe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "le_result", logger)
+		writeResult(result, "le_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheLe scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2106,7 +2106,7 @@ func (e *fheSub) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "sub_result", logger)
+		writeResult(result, "sub_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheSub scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2204,7 +2204,7 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "mul_result", logger)
+		writeResult(result, "mul_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMul scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2487,7 +2487,7 @@ func (e *fheShl) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "shl_result", logger)
+		writeResult(result, "shl_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheShl scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2563,7 +2563,7 @@ func (e *fheShr) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "shr_result", logger)
+		writeResult(result, "shr_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheShr scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2639,7 +2639,7 @@ func (e *fheEq) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "eq_result", logger)
+		writeResult(result, "eq_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheEq scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2715,7 +2715,7 @@ func (e *fheNe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "ne_result", logger)
+		writeResult(result, "ne_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheNe scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2791,7 +2791,7 @@ func (e *fheGe) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "ge_result", logger)
+		writeResult(result, "ge_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheGe scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2867,7 +2867,7 @@ func (e *fheGt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "gt_result", logger)
+		writeResult(result, "gt_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheGt scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -2943,7 +2943,7 @@ func (e *fheLt) Run(accessibleState PrecompileAccessibleState, caller common.Add
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "lt_result", logger)
+		writeResult(result, "lt_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheLt scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -3041,7 +3041,7 @@ func (e *fheMin) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "min_result", logger)
+		writeResult(result, "min_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMin scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
@@ -3117,7 +3117,7 @@ func (e *fheMax) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		importCiphertext(accessibleState, result)
 
 		// TODO: for testing
-		writeResult(result, "max_result", logger)
+		writeResult(result, "max_scalar_result", logger)
 
 		resultHash := result.getHash()
 		logger.Info("fheMax scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
