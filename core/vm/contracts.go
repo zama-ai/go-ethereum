@@ -1465,9 +1465,9 @@ func (e *fheAdd) RequiredGas(accessibleState PrecompileAccessibleState, input []
 		logger.Error("fheAdd/Sub RequiredGas() can not detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
 		return 0
 	}
-	var lhs *verifiedCiphertext
+	var lhs, rhs *verifiedCiphertext
 	if !isScalar {
-		lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+		lhs, rhs, err = get2VerifiedOperands(accessibleState, input)
 		if err != nil {
 			logger.Error("fheAdd/Sub RequiredGas() ciphertext inputs not verified", "err", err, "input", hex.EncodeToString(input))
 			return 0
@@ -1933,9 +1933,9 @@ func (e *fheLe) RequiredGas(accessibleState PrecompileAccessibleState, input []b
 		logger.Error("comparison RequiredGas() can not detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
 		return 0
 	}
-	var lhs *verifiedCiphertext
+	var lhs, rhs *verifiedCiphertext
 	if !isScalar {
-		lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+		lhs, rhs, err = get2VerifiedOperands(accessibleState, input)
 		if err != nil {
 			logger.Error("comparison RequiredGas() ciphertext inputs not verified", "err", err, "input", hex.EncodeToString(input))
 			return 0
@@ -2123,9 +2123,9 @@ func (e *fheMul) RequiredGas(accessibleState PrecompileAccessibleState, input []
 		logger.Error("fheMul RequiredGas() can not detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
 		return 0
 	}
-	var lhs *verifiedCiphertext
+	var lhs, rhs *verifiedCiphertext
 	if !isScalar {
-		lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+		lhs, rhs, err = get2VerifiedOperands(accessibleState, input)
 		if err != nil {
 			logger.Error("fheMul RequiredGas() ciphertext inputs not verified", "err", err, "input", hex.EncodeToString(input))
 			return 0
@@ -2427,9 +2427,9 @@ func (e *fheShl) RequiredGas(accessibleState PrecompileAccessibleState, input []
 		logger.Error("fheShift RequiredGas() can not detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
 		return 0
 	}
-	var lhs *verifiedCiphertext
+	var lhs, rhs *verifiedCiphertext
 	if !isScalar {
-		lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+		lhs, rhs, err = get2VerifiedOperands(accessibleState, input)
 		if err != nil {
 			logger.Error("fheShift RequiredGas() ciphertext inputs not verified", "err", err, "input", hex.EncodeToString(input))
 			return 0
@@ -3037,9 +3037,9 @@ func (e *fheMin) RequiredGas(accessibleState PrecompileAccessibleState, input []
 		logger.Error("fheMin/Max RequiredGas() can not detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
 		return 0
 	}
-	var lhs *verifiedCiphertext
+	var lhs, rhs *verifiedCiphertext
 	if !isScalar {
-		lhs, rhs, err := get2VerifiedOperands(accessibleState, input)
+		lhs, rhs, err = get2VerifiedOperands(accessibleState, input)
 		if err != nil {
 			logger.Error("fheMin/Max RequiredGas() ciphertext inputs not verified", "err", err, "input", hex.EncodeToString(input))
 			return 0
