@@ -21,7 +21,7 @@ jobs:
       - name: Checkout zbc-fhe-tool
         uses: actions/checkout@v3
         with:
-          repository: zama-ai/zbc-fhe-tool
+          repository: zama-ai/fhevm-tfhe-cli
           ref: main
           token: ${{ secrets.CONCRETE_ACTIONS_TOKEN }}
           path: zbc-fhe-tool

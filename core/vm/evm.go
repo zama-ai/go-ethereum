@@ -552,17 +552,19 @@ func (evm *EVM) persistFhePubKeyHash() {
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	nonce := evm.StateDB.GetNonce(caller.Address())
 
-	// Create the actual contract.
 	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
-	ret, contractAddr, leftOverGas, err = evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
+	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
+
+	// Create a separate contract that would be used for protected storage.
+	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, big.NewInt(0), protectedStorageContractAddr, CREATE)
 	if err != nil {
+		ret = nil
+		contractAddr = common.Address{}
 		return
 	}
 
-	// Create a separate contract that would be used for protected storage.
-	// Return the actual contract's return value and contract address.
-	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
-	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, leftOverGas, big.NewInt(0), protectedStorageContractAddr, CREATE)
+	// Create the actual contract.
+	ret, contractAddr, leftOverGas, err = evm.create(caller, &codeAndHash{code: code}, leftOverGas, value, contractAddr, CREATE)
 	if err == nil {
 		evm.persistFhePubKeyHash()
 	}
@@ -573,21 +575,22 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 //
 // The different between Create2 with Create is Create2 uses keccak256(0xff ++ msg.sender ++ salt ++ keccak256(init_code))[12:]
 // instead of the usual sender-and-nonce-hash as the address where the contract is initialized at.
-func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *big.Int, salt *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
-	actualCodeAndHash := &codeAndHash{code: code}
+func (evm *EVM) Create2(caller ContractRef, codeBytes []byte, gas uint64, endowment *big.Int, salt *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+	code := &codeAndHash{code: codeBytes}
 
-	// Create the actual contract.
-	contractAddr = crypto.CreateAddress2(caller.Address(), salt.Bytes32(), actualCodeAndHash.Hash().Bytes())
+	contractAddr = crypto.CreateAddress2(caller.Address(), salt.Bytes32(), code.Hash().Bytes())
+	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 
-	ret, contractAddr, leftOverGas, err = evm.create(caller, actualCodeAndHash, gas, endowment, contractAddr, CREATE2)
+	// Create a separate contract that would be used for protected storage.
+	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, big.NewInt(0), protectedStorageContractAddr, CREATE2)
 	if err != nil {
+		ret = nil
+		contractAddr = common.Address{}
 		return
 	}
 
-	// Create a separate contract that would be used for protected storage.
-	// Return the actual contract's return value and contract address.
-	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
-	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, endowment, protectedStorageContractAddr, CREATE2)
+	// Create the actual contract.
+	ret, contractAddr, leftOverGas, err = evm.create(caller, code, leftOverGas, endowment, contractAddr, CREATE2)
 	if err == nil {
 		evm.persistFhePubKeyHash()
 	}
