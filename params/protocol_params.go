@@ -197,11 +197,12 @@ const (
 	FheUint16RequireGas uint64 = FheUint8RequireGas * 2
 	FheUint32RequireGas uint64 = FheUint16RequireGas * 4
 
-	// TODO: As of now, only support FheUint32 due to inability to cast between types.
+	// TODO: As of now, only support FheUint8. All optimist require predicates are
+	// downcast to FheUint8 at the solidity level. Eventually move to ebool.
 	// If there is at least one optimistic require, we need to decrypt it as it was a normal FHE require.
 	// For every subsequent optimistic require, we need to multiply it with the current require value.
-	FheUint32OptimisticRequireGas    uint64 = FheUint32RequireGas
-	FheUint32OptimisticRequireMulGas uint64 = FheUint32MulGas
+	FheUint8OptimisticRequireGas    uint64 = FheUint8RequireGas
+	FheUint8OptimisticRequireMulGas uint64 = FheUint8MulGas
 
 	// TODO: This will change once we have an FHE-based random generaration with different types.
 	FheRandGas uint64 = NetSstoreCleanGas + ColdSloadCostEIP2929
