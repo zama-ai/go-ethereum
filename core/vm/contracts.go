@@ -1884,15 +1884,15 @@ func (e *optimisticRequire) RequiredGas(accessibleState PrecompileAccessibleStat
 			"input", hex.EncodeToString(input))
 		return 0
 	}
-	if ct.ciphertext.fheUintType != FheUint32 {
-		accessibleState.Interpreter().evm.Logger.Error("optimisticRequire RequiredGas() ciphertext type is not FheUint32",
+	if ct.ciphertext.fheUintType != FheUint8 {
+		accessibleState.Interpreter().evm.Logger.Error("optimisticRequire RequiredGas() ciphertext type is not FheUint8",
 			"type", ct.ciphertext.fheUintType)
 		return 0
 	}
 	if accessibleState.Interpreter().optimisticRequire == nil {
-		return params.FheUint32OptimisticRequireGas
+		return params.FheUint8OptimisticRequireGas
 	}
-	return params.FheUint32OptimisticRequireMulGas
+	return params.FheUint8OptimisticRequireMulGas
 }
 
 func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
@@ -1919,7 +1919,7 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 		return nil, nil
 	}
 	if ct.ciphertext.fheUintType != FheUint32 {
-		msg := "optimisticRequire ciphertext type is not FheUint32"
+		msg := "optimisticRequire ciphertext type is not FheUint8"
 		logger.Error(msg, "type", ct.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
