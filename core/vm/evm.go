@@ -582,7 +582,7 @@ func (evm *EVM) Create2(caller ContractRef, codeBytes []byte, gas uint64, endowm
 	protectedStorageContractAddr := crypto.CreateProtectedStorageContractAddress(contractAddr)
 
 	// Create a separate contract that would be used for protected storage.
-	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, endowment, protectedStorageContractAddr, CREATE2)
+	_, _, leftOverGas, err = evm.create(caller, &codeAndHash{}, gas, big.NewInt(0), protectedStorageContractAddr, CREATE2)
 	if err != nil {
 		ret = nil
 		contractAddr = common.Address{}
