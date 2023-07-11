@@ -1918,7 +1918,7 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 	if !accessibleState.Interpreter().evm.Commit {
 		return nil, nil
 	}
-	if ct.ciphertext.fheUintType != FheUint32 {
+	if ct.ciphertext.fheUintType != FheUint8 {
 		msg := "optimisticRequire ciphertext type is not FheUint8"
 		logger.Error(msg, "type", ct.ciphertext.fheUintType)
 		return nil, errors.New(msg)
