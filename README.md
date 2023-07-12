@@ -1,3 +1,9 @@
+# fhEVM
+This repository is a fork of Ethereum's [go-ethereum](https://github.com/ethereum/go-ethereum) repository.
+We expand on version 1.10.19 by adding functionalities that enable smart contracts to compute on encrypted data.
+
+The following is the original README. 
+
 ## Go Ethereum
 
 Official Golang implementation of the Ethereum protocol.
