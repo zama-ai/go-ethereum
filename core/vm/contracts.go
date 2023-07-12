@@ -3333,6 +3333,11 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 	}
 	castToType := fheUintType(input[32])
 
+	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return importRandomCiphertext(accessibleState, castToType), nil
+	}
+
 	res, err := ct.ciphertext.castTo(castToType)
 	if err != nil {
 		msg := "cast Run() error casting ciphertext to"
