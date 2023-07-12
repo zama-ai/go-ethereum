@@ -160,44 +160,44 @@ const (
 	RefundQuotientEIP3529 uint64 = 5
 
 	// FHE operation costs depend on tfhe-rs performance and hardware acceleration. These values will most certainly change.
-	FheUint8AddSubGas   uint64 = 5000
-	FheUint16AddSubGas  uint64 = FheUint8AddSubGas * 2
-	FheUint32AddSubGas  uint64 = FheUint16AddSubGas * 4
-	FheUint8MulGas      uint64 = 9000
-	FheUint16MulGas     uint64 = FheUint8MulGas * 3
-	FheUint32MulGas     uint64 = FheUint16MulGas * 10
-	FheUint8BitwiseGas  uint64 = 2000
-	FheUint16BitwiseGas uint64 = FheUint8BitwiseGas * 2
-	FheUint32BitwiseGas uint64 = FheUint8BitwiseGas * 4
-	FheUint8ShiftGas    uint64 = 1000
-	FheUint16ShiftGas   uint64 = FheUint8ShiftGas * 2
-	FheUint32ShiftGas   uint64 = FheUint8ShiftGas * 4
-	FheUint8LeGas       uint64 = 3300
-	FheUint16LeGas      uint64 = 5000
-	FheUint32LeGas      uint64 = 11000
-	FheUint8MinMaxGas   uint64 = 3000
-	FheUint16MinMaxGas  uint64 = FheUint8MinMaxGas * 2
-	FheUint32MinMaxGas  uint64 = FheUint8MinMaxGas * 4
-	FheUint8NegNotGas   uint64 = 500
-	FheUint16NegNotGas  uint64 = FheUint8NegNotGas * 2
-	FheUint32NegNotGas  uint64 = FheUint8NegNotGas * 4
+	FheUint8AddSubGas   uint64 = 83000
+	FheUint16AddSubGas  uint64 = 108000
+	FheUint32AddSubGas  uint64 = 130000
+	FheUint8MulGas      uint64 = 150000
+	FheUint16MulGas     uint64 = 200000
+	FheUint32MulGas     uint64 = 270000
+	FheUint8BitwiseGas  uint64 = 20000
+	FheUint16BitwiseGas uint64 = 21000
+	FheUint32BitwiseGas uint64 = 22000
+	FheUint8ShiftGas    uint64 = 105000
+	FheUint16ShiftGas   uint64 = 128000
+	FheUint32ShiftGas   uint64 = 160000
+	FheUint8LeGas       uint64 = 61000
+	FheUint16LeGas      uint64 = 83000
+	FheUint32LeGas      uint64 = 109000
+	FheUint8MinMaxGas   uint64 = 108000
+	FheUint16MinMaxGas  uint64 = 134000
+	FheUint32MinMaxGas  uint64 = 150000
+	FheUint8NegNotGas   uint64 = 83000
+	FheUint16NegNotGas  uint64 = 108000
+	FheUint32NegNotGas  uint64 = 130000
 
 	// TODO: Cost will depend on the complexity of doing reencryption by the oracle.
-	FheUint8ReencryptGas  uint64 = 15000
-	FheUint16ReencryptGas uint64 = FheUint8ReencryptGas * 2
-	FheUint32ReencryptGas uint64 = FheUint16ReencryptGas * 4
+	FheUint8ReencryptGas  uint64 = 1000
+	FheUint16ReencryptGas uint64 = 1100
+	FheUint32ReencryptGas uint64 = 1200
 
 	// As of now, verification costs only cover ciphertext deserialization and assume there is no ZKPoK to verify.
-	FheUint8VerifyGas  uint64 = 500
-	FheUint16VerifyGas uint64 = 600
-	FheUint32VerifyGas uint64 = 2000
+	FheUint8VerifyGas  uint64 = 200
+	FheUint16VerifyGas uint64 = 300
+	FheUint32VerifyGas uint64 = 400
 
 	// TODO: Cost will depend on the complexity of doing decryption by the oracle.
-	FheUint8RequireGas  uint64 = 10000
-	FheUint16RequireGas uint64 = FheUint8RequireGas * 2
-	FheUint32RequireGas uint64 = FheUint16RequireGas * 4
+	FheUint8RequireGas  uint64 = 170000
+	FheUint16RequireGas uint64 = 180000
+	FheUint32RequireGas uint64 = 190000
 
-	// TODO: As of now, only support FheUint8. All optimist require predicates are
+	// TODO: As of now, only support FheUint8. All optimistic require predicates are
 	// downcast to FheUint8 at the solidity level. Eventually move to ebool.
 	// If there is at least one optimistic require, we need to decrypt it as it was a normal FHE require.
 	// For every subsequent optimistic require, we need to multiply it with the current require value.
@@ -210,14 +210,14 @@ const (
 	// TODO: The values here are chosen somewhat arbitrarily (at least the 8 bit ones). Also, we don't
 	// take into account whether a ciphertext existed (either "current" or "original") for the given handle.
 	// Finally, costs are likely to change in the future.
-	FheUint8ProtectedStorageSstoreGas  uint64 = NetSstoreInitGas * 3
+	FheUint8ProtectedStorageSstoreGas  uint64 = NetSstoreInitGas + 2000
 	FheUint16ProtectedStorageSstoreGas uint64 = FheUint8ProtectedStorageSstoreGas * 2
-	FheUint32ProtectedStorageSstoreGas uint64 = FheUint16ProtectedStorageSstoreGas * 4
+	FheUint32ProtectedStorageSstoreGas uint64 = FheUint16ProtectedStorageSstoreGas * 2
 
 	// TODO: We don't take whether the slot is cold or warm into consideration.
-	FheUint8ProtectedStorageSloadGas  uint64 = ColdSloadCostEIP2929 * 3
+	FheUint8ProtectedStorageSloadGas  uint64 = ColdSloadCostEIP2929 + 200
 	FheUint16ProtectedStorageSloadGas uint64 = FheUint8ProtectedStorageSloadGas * 2
-	FheUint32ProtectedStorageSloadGas uint64 = FheUint16ProtectedStorageSloadGas * 4
+	FheUint32ProtectedStorageSloadGas uint64 = FheUint16ProtectedStorageSloadGas * 2
 
 	FheCastGas uint64 = 100
 
