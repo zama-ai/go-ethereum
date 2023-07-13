@@ -1304,6 +1304,9 @@ void public_key_encrypt_and_serialize_fhe_uint8_list(void* pks, uint8_t value, B
 
 	r = compact_fhe_uint8_list_serialize(list, out);
 	assert(r == 0);
+
+	r = compact_fhe_uint8_list_destroy(list);
+	assert(r == 0);
 }
 
 void public_key_encrypt_and_serialize_fhe_uint16_list(void* pks, uint16_t value, Buffer* out) {
@@ -1314,6 +1317,9 @@ void public_key_encrypt_and_serialize_fhe_uint16_list(void* pks, uint16_t value,
 
 	r = compact_fhe_uint16_list_serialize(list, out);
 	assert(r == 0);
+
+	r = compact_fhe_uint16_list_destroy(list);
+	assert(r == 0);
 }
 
 void public_key_encrypt_and_serialize_fhe_uint32_list(void* pks, uint32_t value, Buffer* out) {
@@ -1323,6 +1329,9 @@ void public_key_encrypt_and_serialize_fhe_uint32_list(void* pks, uint32_t value,
   	assert(r == 0);
 
 	r = compact_fhe_uint32_list_serialize(list, out);
+	assert(r == 0);
+
+	r = compact_fhe_uint32_list_destroy(list);
 	assert(r == 0);
 }
 
@@ -1548,10 +1557,10 @@ func (ct *tfheCiphertext) deserializeCompact(in []byte, t fheUintType) error {
 		}
 		var err error
 		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint8(ptr)
 		if err != nil {
 			return err
 		}
-		C.destroy_fhe_uint8(ptr)
 	case FheUint16:
 		ptr := C.deserialize_compact_fhe_uint16(toBufferView((in)))
 		if ptr == nil {
@@ -1559,10 +1568,10 @@ func (ct *tfheCiphertext) deserializeCompact(in []byte, t fheUintType) error {
 		}
 		var err error
 		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint16(ptr)
 		if err != nil {
 			return err
 		}
-		C.destroy_fhe_uint16(ptr)
 	case FheUint32:
 		ptr := C.deserialize_compact_fhe_uint32(toBufferView((in)))
 		if ptr == nil {
@@ -1570,10 +1579,10 @@ func (ct *tfheCiphertext) deserializeCompact(in []byte, t fheUintType) error {
 		}
 		var err error
 		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint32(ptr)
 		if err != nil {
 			return err
 		}
-		C.destroy_fhe_uint32(ptr)
 	default:
 		panic("deserializeCompact: unexpected ciphertext type")
 	}
@@ -1586,20 +1595,31 @@ func (ct *tfheCiphertext) deserializeCompact(in []byte, t fheUintType) error {
 // The resulting ciphertext is automaticaly expanded.
 func (ct *tfheCiphertext) encrypt(value big.Int, t fheUintType) *tfheCiphertext {
 	var ptr unsafe.Pointer
+	var err error
 	switch t {
 	case FheUint8:
 		ptr = C.public_key_encrypt_fhe_uint8(pks, C.uint8_t(value.Uint64()))
+		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint8(ptr)
+		if err != nil {
+			panic(err)
+		}
 	case FheUint16:
 		ptr = C.public_key_encrypt_fhe_uint16(pks, C.uint16_t(value.Uint64()))
+		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint16(ptr)
+		if err != nil {
+			panic(err)
+		}
 	case FheUint32:
 		ptr = C.public_key_encrypt_fhe_uint32(pks, C.uint32_t(value.Uint64()))
+		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint32(ptr)
+		if err != nil {
+			panic(err)
+		}
 	default:
 		panic("encrypt: unexpected ciphertext type")
-	}
-	var err error
-	ct.serialization, err = serialize(ptr, t)
-	if err != nil {
-		panic(err)
 	}
 	ct.fheUintType = t
 	ct.computeHash()
@@ -1608,20 +1628,31 @@ func (ct *tfheCiphertext) encrypt(value big.Int, t fheUintType) *tfheCiphertext 
 
 func (ct *tfheCiphertext) trivialEncrypt(value big.Int, t fheUintType) *tfheCiphertext {
 	var ptr unsafe.Pointer
+	var err error
 	switch t {
 	case FheUint8:
 		ptr = C.trivial_encrypt_fhe_uint8(sks, C.uint8_t(value.Uint64()))
+		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint8(ptr)
+		if err != nil {
+			panic(err)
+		}
 	case FheUint16:
 		ptr = C.trivial_encrypt_fhe_uint16(sks, C.uint16_t(value.Uint64()))
+		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint16(ptr)
+		if err != nil {
+			panic(err)
+		}
 	case FheUint32:
 		ptr = C.trivial_encrypt_fhe_uint32(sks, C.uint32_t(value.Uint64()))
+		ct.serialization, err = serialize(ptr, t)
+		C.destroy_fhe_uint32(ptr)
+		if err != nil {
+			panic(err)
+		}
 	default:
 		panic("trivialEncrypt: unexpected ciphertext type")
-	}
-	var err error
-	ct.serialization, err = serialize(ptr, ct.fheUintType)
-	if err != nil {
-		panic(err)
 	}
 	ct.fheUintType = t
 	ct.computeHash()
