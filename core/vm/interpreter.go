@@ -105,7 +105,7 @@ type EVMInterpreter struct {
 
 	verifiedCiphertexts map[common.Hash]*verifiedCiphertext // A map from a ciphertext hash to itself and stack depth at which it is verified
 
-	optimisticRequire *tfheCiphertext // Product of all optimistic requires encountered during execution
+	optimisticRequires []*tfheCiphertext // All optimistic requires encountered up to that point in the txn execution
 }
 
 // NewEVMInterpreter returns a new instance of the Interpreter.
@@ -149,7 +149,28 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		evm:                 evm,
 		cfg:                 cfg,
 		verifiedCiphertexts: make(map[common.Hash]*verifiedCiphertext),
+		optimisticRequires:  make([]*tfheCiphertext, 0),
 	}
+}
+
+// If there are optimistic requires, check them by doing bitwise AND on all of them.
+// That works, because we assume their values are either 0 or 1. If there is at least
+// one 0, the result will be 0 (false).
+func (in *EVMInterpreter) evaluateRemainingOptimisticRequires() (result bool, err error) {
+	len := len(in.optimisticRequires)
+	defer func() { in.optimisticRequires = make([]*tfheCiphertext, 0) }()
+	if len != 0 {
+		var cumulative *tfheCiphertext = in.optimisticRequires[0]
+		for i := 1; i < len; i++ {
+			cumulative, err = cumulative.bitand(in.optimisticRequires[i])
+			if err != nil {
+				in.evm.Logger.Error("optimisticRequire bitand failed", "err", err)
+				return false, err
+			}
+		}
+		return evaluateRequire(cumulative, in)
+	}
+	return true, nil
 }
 
 // Run loops and evaluates the contract's code with the given input data and returns
@@ -291,11 +312,13 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	if err == errStopToken {
 		err = nil // clear stop token error
 
-		// If we are finishing execution (about to go to from depth 1 to depth 0) and there
-		// is an optimistic require, check its decrypted value. If false, return as if
-		// execution is to be reverted.
-		if in.evm.depth == 1 && in.optimisticRequire != nil {
-			if value, evalError := evaluateRequire(in.optimisticRequire, in); evalError != nil || !value {
+		// If we are finishing execution (about to go to from depth 1 to depth 0), evaluate
+		// any remaining optimistic requires.
+		if in.evm.depth == 1 {
+			result, evalErr := in.evaluateRemainingOptimisticRequires()
+			if evalErr != nil {
+				err = evalErr
+			} else if !result {
 				err = ErrExecutionReverted
 			}
 		}

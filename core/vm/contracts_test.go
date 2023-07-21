@@ -1531,6 +1531,36 @@ func TestVerifyCiphertextBadCiphertext(t *testing.T) {
 	}
 }
 
+func Decrypt(t *testing.T, fheUintType fheUintType) {
+	var value uint64
+	switch fheUintType {
+	case FheUint8:
+		value = 2
+	case FheUint16:
+		value = 4283
+	case FheUint32:
+		value = 1333337
+	}
+	c := &decrypt{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, fheUintType).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 32 {
+		t.Fatalf("decrypt expected output len of 32, got %v", len(out))
+	}
+	result := big.Int{}
+	result.SetBytes(out)
+	if result.Uint64() != value {
+		t.Fatalf("decrypt result not equal to value, result %v != value %v", result.Uint64(), value)
+	}
+}
+
 func TestFheAdd8(t *testing.T) {
 	FheAdd(t, FheUint8, false)
 }
@@ -1937,6 +1967,18 @@ func TestFheScalarMax16(t *testing.T) {
 
 func TestFheScalarMax32(t *testing.T) {
 	FheMax(t, FheUint32, true)
+}
+
+func TestDecrypt8(t *testing.T) {
+	Decrypt(t, FheUint8)
+}
+
+func TestDecrypt16(t *testing.T) {
+	Decrypt(t, FheUint16)
+}
+
+func TestDecrypt32(t *testing.T) {
+	Decrypt(t, FheUint32)
 }
 
 func TestUnknownCiphertextHandle(t *testing.T) {

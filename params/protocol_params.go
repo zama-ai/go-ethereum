@@ -182,10 +182,13 @@ const (
 	FheUint16NegNotGas  uint64 = 108000
 	FheUint32NegNotGas  uint64 = 130000
 
-	// TODO: Cost will depend on the complexity of doing reencryption by the oracle.
+	// TODO: Costs will depend on the complexity of doing reencryption/decryption by the oracle.
 	FheUint8ReencryptGas  uint64 = 1000
 	FheUint16ReencryptGas uint64 = 1100
 	FheUint32ReencryptGas uint64 = 1200
+	FheUint8DecryptGas    uint64 = 600
+	FheUint16DecryptGas   uint64 = 700
+	FheUint32DecryptGas   uint64 = 800
 
 	// As of now, verification costs only cover ciphertext deserialization and assume there is no ZKPoK to verify.
 	FheUint8VerifyGas  uint64 = 200
@@ -200,9 +203,10 @@ const (
 	// TODO: As of now, only support FheUint8. All optimistic require predicates are
 	// downcast to FheUint8 at the solidity level. Eventually move to ebool.
 	// If there is at least one optimistic require, we need to decrypt it as it was a normal FHE require.
-	// For every subsequent optimistic require, we need to multiply it with the current require value.
-	FheUint8OptimisticRequireGas    uint64 = FheUint8RequireGas
-	FheUint8OptimisticRequireMulGas uint64 = FheUint8MulGas
+	// For every subsequent optimistic require, we need to bitand it with the current require value - that
+	// works, because we assume requires have a value of 0 or 1.
+	FheUint8OptimisticRequireGas       uint64 = FheUint8RequireGas
+	FheUint8OptimisticRequireBitandGas uint64 = FheUint8BitwiseGas
 
 	// TODO: This will change once we have an FHE-based random generaration with different types.
 	FheRandGas uint64 = NetSstoreCleanGas + ColdSloadCostEIP2929
