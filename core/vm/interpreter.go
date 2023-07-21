@@ -105,7 +105,9 @@ type EVMInterpreter struct {
 
 	verifiedCiphertexts map[common.Hash]*verifiedCiphertext // A map from a ciphertext hash to itself and stack depth at which it is verified
 
-	optimisticRequire *tfheCiphertext // Product of all optimistic requires encountered during execution
+	optimisticRequires []*tfheCiphertext // All optimistic requires encountered up to that point in the txn execution
+
+	testing bool // A flag to show if we are in testing mode
 }
 
 // NewEVMInterpreter returns a new instance of the Interpreter.
@@ -149,6 +151,7 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		evm:                 evm,
 		cfg:                 cfg,
 		verifiedCiphertexts: make(map[common.Hash]*verifiedCiphertext),
+		optimisticRequires:  make([]*tfheCiphertext, 0),
 	}
 }
 
@@ -291,11 +294,13 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	if err == errStopToken {
 		err = nil // clear stop token error
 
-		// If we are finishing execution (about to go to from depth 1 to depth 0) and there
-		// is an optimistic require, check its decrypted value. If false, return as if
-		// execution is to be reverted.
-		if in.evm.depth == 1 && in.optimisticRequire != nil {
-			if value, evalError := evaluateRequire(in.optimisticRequire, in); evalError != nil || !value {
+		// If we are finishing execution (about to go to from depth 1 to depth 0), evaluate
+		// any remaining optimistic requires.
+		if in.evm.depth == 1 {
+			result, evalErr := evaluateRemainingOptimisticRequires(in)
+			if evalErr != nil {
+				err = evalErr
+			} else if !result {
 				err = ErrExecutionReverted
 			}
 		}

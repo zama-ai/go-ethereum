@@ -92,6 +92,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -134,6 +135,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -177,6 +179,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -220,6 +223,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -263,6 +267,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1242,19 +1247,17 @@ var requireHttpClient http.Client = http.Client{}
 var publicSignatureKey []byte
 var privateSignatureKey []byte
 
-func requireBytesToSign(ciphertext []byte, value bool) []byte {
+func requireBytesToSign(ciphertext []byte, value big.Int) []byte {
 	// TODO: avoid copy
 	b := make([]byte, 0, len(ciphertext)+1)
 	b = append(b, ciphertext...)
-	if value {
-		b = append(b, 1)
-	} else {
-		b = append(b, 0)
-	}
+	valueBuf := make([]byte, 8)
+	value.FillBytes(valueBuf)
+	b = append(b, valueBuf...)
 	return b
 }
 
-func signRequire(ciphertext []byte, value bool) string {
+func signRequire(ciphertext []byte, value big.Int) string {
 	b := requireBytesToSign(ciphertext, value)
 	signature := ed25519.Sign(privateSignatureKey, b)
 	return hex.EncodeToString(signature)
@@ -1274,25 +1277,20 @@ func init() {
 		return
 	}
 
-	switch mode := strings.ToLower(tomlConfig.Oracle.Mode); mode {
-	case "oracle":
+	if mode := strings.ToLower(tomlConfig.Oracle.Mode); mode == "oracle" {
 		priv, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/private.ed25519")
 		if err != nil {
 			fmt.Println("failed to read private.ed25519 file: " + err.Error())
 			return
 		}
 		privateSignatureKey = priv
-	case "node":
-		pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
-		if err != nil {
-			fmt.Println("failed to read public.ed25519 file: " + err.Error())
-			return
-		}
-		publicSignatureKey = pub
-	default:
-		fmt.Println("invalid oracle mode: " + mode)
-		panic(fmt.Sprintf("invalid oracle mode: %s", mode))
 	}
+	pub, err := os.ReadFile(home + "/.evmosd/zama/keys/signature-keys/public.ed25519")
+	if err != nil {
+		fmt.Println("failed to read public.ed25519 file: " + err.Error())
+		return
+	}
+	publicSignatureKey = pub
 }
 
 func isVerifiedAtCurrentDepth(interpreter *EVMInterpreter, ct *verifiedCiphertext) bool {
@@ -1436,6 +1434,12 @@ var fheReencryptGasCosts = map[fheUintType]uint64{
 	FheUint8:  params.FheUint8ReencryptGas,
 	FheUint16: params.FheUint16ReencryptGas,
 	FheUint32: params.FheUint32ReencryptGas,
+}
+
+var fheDecryptGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8DecryptGas,
+	FheUint16: params.FheUint16DecryptGas,
+	FheUint32: params.FheUint32DecryptGas,
 }
 
 var fheVerifyGasCosts = map[fheUintType]uint64{
@@ -1705,6 +1709,155 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	return nil, errors.New(msg)
 }
 
+type requireMessage struct {
+	Value     uint64 `json:"value"`
+	Signature string `json:"signature"`
+}
+
+func decryptionKey(ciphertext []byte) string {
+	// Take the Keccak256 and remove the leading 0x.
+	return crypto.Keccak256Hash(ciphertext).Hex()[2:]
+}
+
+func decryptionURL(key *string) string {
+	return tomlConfig.Oracle.OracleDBAddress + "/decryption/" + *key
+}
+
+// Puts the given ciphertext's decryption to the oracle DB or exits the process on errors.
+// Returns the decrypted value.
+func decryptValueAsOracle(ct *tfheCiphertext, interpreter *EVMInterpreter) (uint64, error) {
+	logger := interpreter.evm.Logger
+	ciphertext := ct.serialize()
+	plaintext, err := ct.decrypt()
+	if err != nil {
+		logger.Error("decryptValueAsOracle decryption failed", "err", err)
+		return 0, err
+	}
+	uint64Value := plaintext.Uint64()
+	if interpreter.evm.EthCall {
+		// Don't mutate the DB from view methods (EthCall RPC).
+		return uint64Value, nil
+	}
+
+	key := decryptionKey(ciphertext)
+	j, err := json.Marshal(requireMessage{uint64Value, signRequire(ciphertext, plaintext)})
+	if err != nil {
+		logger.Error("decryptValueAsOracle JSON Marshal() failed, exiting process", "err", err, "key", key)
+		return 0, err
+	}
+	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
+		req, err := http.NewRequest(http.MethodPut, decryptionURL(&key), bytes.NewReader(j))
+		if err != nil {
+			logger.Error("decryptValueAsOracle NewRequest() failed, retrying", "err", err, "key", key)
+			continue
+		}
+		resp, err := requireHttpClient.Do(req)
+		if err != nil {
+			logger.Error("decryptValueAsOracle HTTP request Do() failed, retrying", "err", err, "key", key)
+			continue
+		}
+		defer resp.Body.Close()
+		io.ReadAll(resp.Body)
+		if resp.StatusCode != 200 {
+			logger.Error("decryptValueAsOracle received HTTP status code != 200, retrying", "code", resp.StatusCode, "key", key)
+			continue
+		}
+		logger.Info("decryptValueAsOracle sucess", "value", uint64Value, "key", key)
+		return uint64Value, nil
+	}
+	logger.Error("putRequire reached maximum retries, exiting process",
+		"retries", tomlConfig.Oracle.RequireRetryCount, "key", key)
+	exitProcess()
+	return 0, nil
+}
+
+// Gets the given decryption from the oracle DB and returns its value.
+// Exits the process on errors or signature verification failure.
+func decryptValueAsNode(ct *tfheCiphertext, interpreter *EVMInterpreter) (uint64, error) {
+	logger := interpreter.evm.Logger
+	ciphertext := ct.serialize()
+	key := decryptionKey(ciphertext)
+	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
+		req, err := http.NewRequest(http.MethodGet, decryptionURL(&key), http.NoBody)
+		if err != nil {
+			logger.Error("decryptValueAsNode NewRequest() failed, retrying", "err", err)
+			return 0, err
+		}
+		resp, err := requireHttpClient.Do(req)
+		if err != nil {
+			logger.Error("decryptValueAsNode HTTP request Do() failed, retrying", "err", err)
+			continue
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if resp.StatusCode != 200 || err != nil {
+			logger.Error("decryptValueAsNode HTTP response with failure, retrying", "err", err, "code", resp.StatusCode)
+			continue
+		}
+		msg := requireMessage{}
+		if err := json.Unmarshal(body, &msg); err != nil {
+			logger.Error("decryptValueAsNode JSON Unmarshal() failed, retrying", "err", err)
+			continue
+		}
+		bigIntValue := big.NewInt(0)
+		bigIntValue.SetUint64(msg.Value)
+		b := requireBytesToSign(ciphertext, *bigIntValue)
+		s, err := hex.DecodeString(msg.Signature)
+		if err != nil {
+			logger.Error("decryptValueAsNode hex decode failed, retrying", "err", err)
+			continue
+		}
+		if !ed25519.Verify(publicSignatureKey, b, s) {
+			logger.Error("decryptValueAsNode ed25519 signature failed to verify, retrying")
+			continue
+		}
+		logger.Info("decryptValueAsNode success", "value", msg.Value, "key", key)
+		return msg.Value, nil
+	}
+	logger.Error("decryptValueAsNode reached maximum retries, exiting process", "retries", tomlConfig.Oracle.RequireRetryCount)
+	exitProcess()
+	return 0, nil
+}
+
+func decryptValue(ct *tfheCiphertext, interpreter *EVMInterpreter) (uint64, error) {
+	if interpreter.testing {
+		v, err := ct.decrypt()
+		return v.Uint64(), err
+	}
+	mode := strings.ToLower(tomlConfig.Oracle.Mode)
+	switch mode {
+	case "oracle":
+		return decryptValueAsOracle(ct, interpreter)
+	case "node":
+		return decryptValueAsNode(ct, interpreter)
+	}
+	interpreter.evm.Logger.Error("decryptValue invalid mode", "mode", mode)
+	exitProcess()
+	return 0, nil
+}
+
+// If there are optimistic requires, check them by doing bitwise AND on all of them.
+// That works, because we assume their values are either 0 or 1. If there is at least
+// one 0, the result will be 0 (false).
+func evaluateRemainingOptimisticRequires(in *EVMInterpreter) (bool, error) {
+	len := len(in.optimisticRequires)
+	defer func() { in.optimisticRequires = make([]*tfheCiphertext, 0) }()
+	if len != 0 {
+		var cumulative *tfheCiphertext = in.optimisticRequires[0]
+		var err error
+		for i := 1; i < len; i++ {
+			cumulative, err = cumulative.bitand(in.optimisticRequires[i])
+			if err != nil {
+				in.evm.Logger.Error("evaluateRemainingOptimisticRequires bitand failed", "err", err)
+				return false, err
+			}
+		}
+		result, err := decryptValue(cumulative, in)
+		return result != 0, err
+	}
+	return true, nil
+}
+
 type require struct{}
 
 func (e *require) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
@@ -1721,150 +1874,36 @@ func (e *require) RequiredGas(accessibleState PrecompileAccessibleState, input [
 	return fheRequireGasCosts[ct.ciphertext.fheUintType]
 }
 
-type requireMessage struct {
-	Value     bool   `json:"value"`
-	Signature string `json:"signature"`
-}
-
-func requireKey(ciphertext []byte) string {
-	// Take the Keccak256 and remove the leading 0x.
-	return crypto.Keccak256Hash(ciphertext).Hex()[2:]
-}
-
-func requireURL(key *string) string {
-	return tomlConfig.Oracle.OracleDBAddress + "/require/" + *key
-}
-
-// Puts the given ciphertext as a require to the oracle DB or exits the process on errors.
-// Returns the require value.
-func putRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) (bool, error) {
-	logger := interpreter.evm.Logger
-	ciphertext := ct.serialize()
-	plaintext, err := ct.decrypt()
-	if err != nil {
-		logger.Error("putRequire decryption failed", "err", err)
-		return false, err
-	}
-	value := (plaintext.BitLen() != 0)
-	key := requireKey(ciphertext)
-	j, err := json.Marshal(requireMessage{value, signRequire(ciphertext, value)})
-	if err != nil {
-		logger.Error("putRequire JSON Marshal() failed, exiting process", "err", err, "key", key)
-		return false, err
-	}
-	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
-		req, err := http.NewRequest(http.MethodPut, requireURL(&key), bytes.NewReader(j))
-		if err != nil {
-			logger.Error("putRequire NewRequest() failed, retrying", "err", err, "key", key)
-			continue
-		}
-		resp, err := requireHttpClient.Do(req)
-		if err != nil {
-			logger.Error("putRequire HTTP request Do() failed, retrying", "err", err, "key", key)
-			continue
-		}
-		defer resp.Body.Close()
-		io.ReadAll(resp.Body)
-		if resp.StatusCode != 200 {
-			logger.Error("putRequire received HTTP status code != 200, retrying", "code", resp.StatusCode, "key", key)
-			continue
-		}
-		logger.Info("putRequire sucess", "value", value, "key", key)
-		return value, nil
-	}
-	logger.Error("putRequire reached maximum retries, exiting process",
-		"retries", tomlConfig.Oracle.RequireRetryCount, "key", key)
-	exitProcess()
-	return value, nil
-}
-
-// Gets the given require from the oracle DB and returns its value.
-// Exits the process on errors or signature verification failure.
-func getRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) (bool, error) {
-	logger := interpreter.evm.Logger
-	ciphertext := ct.serialize()
-	key := requireKey(ciphertext)
-	for try := uint8(1); try <= tomlConfig.Oracle.RequireRetryCount+1; try++ {
-		req, err := http.NewRequest(http.MethodGet, requireURL(&key), http.NoBody)
-		if err != nil {
-			logger.Error("getRequire NewRequest() failed, retrying", "err", err)
-			return false, err
-		}
-		resp, err := requireHttpClient.Do(req)
-		if err != nil {
-			logger.Error("getRequire HTTP request Do() failed, retrying", "err", err)
-			continue
-		}
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if resp.StatusCode != 200 || err != nil {
-			logger.Error("getRequire HTTP response with failure, retrying", "err", err, "code", resp.StatusCode)
-			continue
-		}
-		msg := requireMessage{}
-		if err := json.Unmarshal(body, &msg); err != nil {
-			logger.Error("getRequire JSON Unmarshal() failed, retrying", "err", err)
-			continue
-		}
-		b := requireBytesToSign(ciphertext, msg.Value)
-		s, err := hex.DecodeString(msg.Signature)
-		if err != nil {
-			logger.Error("getRequire hex decode failed, retrying", "err", err)
-			continue
-		}
-		if !ed25519.Verify(publicSignatureKey, b, s) {
-			logger.Error("getRequire ed25519 signature failed to verify, retrying")
-			continue
-		}
-		logger.Info("getRequire success", "value", msg.Value, "key", key)
-		return msg.Value, nil
-	}
-	logger.Error("getRequire reached maximum retries, exiting process", "retries", tomlConfig.Oracle.RequireRetryCount)
-	exitProcess()
-	return false, nil
-}
-
-func evaluateRequire(ct *tfheCiphertext, interpreter *EVMInterpreter) (bool, error) {
-	mode := strings.ToLower(tomlConfig.Oracle.Mode)
-	switch mode {
-	case "oracle":
-		return putRequire(ct, interpreter)
-	case "node":
-		return getRequire(ct, interpreter)
-	}
-	interpreter.evm.Logger.Error("evaluateRequire invalid mode", "mode", mode)
-	exitProcess()
-	return false, nil
-}
-
 func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	if accessibleState.Interpreter().evm.EthCall {
-		msg := "require not supported on EthCall"
-		accessibleState.Interpreter().evm.Logger.Error(msg)
-		return nil, errors.New(msg)
-	}
+	logger := accessibleState.Interpreter().evm.Logger
 	if len(input) != 32 {
 		msg := "require input len must be 32 bytes"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
+		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct == nil {
 		msg := "require unverified handle"
-		accessibleState.Interpreter().evm.Logger.Error(msg, "input", hex.EncodeToString(input))
+		logger.Error(msg, "input", hex.EncodeToString(input))
 		return nil, errors.New(msg)
 	}
-	// If we are not committing to state, assume the require is true, avoiding any side effects
-	// (i.e. mutatiting the oracle DB).
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, assume the require is true.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return nil, nil
 	}
-	value, err := evaluateRequire(ct.ciphertext, accessibleState.Interpreter())
-	if err != nil {
-		accessibleState.Interpreter().evm.Logger.Error("require failed to evaluate, reverting", "err", err)
+	// Make sure we don't decrypt before any optimistic requires are checked.
+	optReqResult, optReqErr := evaluateRemainingOptimisticRequires(accessibleState.Interpreter())
+	if optReqErr != nil {
+		return nil, optReqErr
+	} else if !optReqResult {
 		return nil, ErrExecutionReverted
-	} else if !value {
-		accessibleState.Interpreter().evm.Logger.Error("require value is false, reverting")
+	}
+	value, err := decryptValue(ct.ciphertext, accessibleState.Interpreter())
+	if err != nil {
+		logger.Error("require failed to decrypt, reverting", "err", err)
+		return nil, err
+	} else if value == 0 {
+		logger.Error("require value is false, reverting")
 		return nil, ErrExecutionReverted
 	}
 	return nil, nil
@@ -1889,19 +1928,14 @@ func (e *optimisticRequire) RequiredGas(accessibleState PrecompileAccessibleStat
 			"type", ct.ciphertext.fheUintType)
 		return 0
 	}
-	if accessibleState.Interpreter().optimisticRequire == nil {
+	if len(accessibleState.Interpreter().optimisticRequires) == 0 {
 		return params.FheUint8OptimisticRequireGas
 	}
-	return params.FheUint8OptimisticRequireMulGas
+	return params.FheUint8OptimisticRequireBitandGas
 }
 
 func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	logger := accessibleState.Interpreter().evm.Logger
-	if accessibleState.Interpreter().evm.EthCall {
-		msg := "optimisticRequire not supported on EthCall"
-		logger.Error(msg)
-		return nil, errors.New(msg)
-	}
 	if len(input) != 32 {
 		msg := "optimisticRequire input len must be 32 bytes"
 		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
@@ -1913,9 +1947,8 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 		logger.Error(msg, "input", hex.EncodeToString(input))
 		return nil, errors.New(msg)
 	}
-	// If we are not committing to state, assume the require is true, avoiding any side effects
-	// (i.e. mutatiting the oracle DB).
-	if !accessibleState.Interpreter().evm.Commit {
+	// If we are doing gas estimation, don't do anything as we would assume all requires are true.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
 		return nil, nil
 	}
 	if ct.ciphertext.fheUintType != FheUint8 {
@@ -1923,20 +1956,7 @@ func (e *optimisticRequire) Run(accessibleState PrecompileAccessibleState, calle
 		logger.Error(msg, "type", ct.ciphertext.fheUintType)
 		return nil, errors.New(msg)
 	}
-	// If this is the first optimistic require, just assign it.
-	// If there is already an optimistic one, just multiply it with the incoming one. Here, we assume
-	// that ciphertexts have value of either 0 or 1. Thus, multiplying all optimistic requires leads to
-	// one optimistic require at the end that we decrypt when we are about to finish execution.
-	if accessibleState.Interpreter().optimisticRequire == nil {
-		accessibleState.Interpreter().optimisticRequire = ct.ciphertext
-	} else {
-		optimisticRequire, err := accessibleState.Interpreter().optimisticRequire.mul(ct.ciphertext)
-		if err != nil {
-			logger.Error("optimisticRequire mul failed", "err", err)
-			return nil, err
-		}
-		accessibleState.Interpreter().optimisticRequire = optimisticRequire
-	}
+	accessibleState.Interpreter().optimisticRequires = append(accessibleState.Interpreter().optimisticRequires, ct.ciphertext)
 	return nil, nil
 }
 
@@ -3355,6 +3375,59 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 	}
 
 	return resHash.Bytes(), nil
+}
+
+type decrypt struct{}
+
+func (e *decrypt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) != 32 {
+		logger.Error("decrypt RequiredGas() input len must be 32 bytes", "input", hex.EncodeToString(input), "len", len(input))
+		return 0
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		logger.Error("decrypt RequiredGas() input doesn't point to verified ciphertext", "input", hex.EncodeToString(input))
+		return 0
+	}
+	return fheDecryptGasCosts[ct.ciphertext.fheUintType]
+}
+
+func (e *decrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) != 32 {
+		msg := "decrypt input len must be 32 bytes"
+		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
+		return nil, errors.New(msg)
+	}
+	// If we are doing gas estimation, skip decryption and return 0.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return make([]byte, 32), nil
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		msg := "decrypt unverified handle"
+		logger.Error(msg, "input", hex.EncodeToString(input))
+		return nil, errors.New(msg)
+	}
+	// Make sure we don't decrypt before any optimistic requires are checked.
+	optReqResult, optReqErr := evaluateRemainingOptimisticRequires(accessibleState.Interpreter())
+	if optReqErr != nil {
+		return nil, optReqErr
+	} else if !optReqResult {
+		return nil, ErrExecutionReverted
+	}
+	plaintext, err := decryptValue(ct.ciphertext, accessibleState.Interpreter())
+	if err != nil {
+		logger.Error("decrypt failed", "err", err)
+		return nil, err
+	}
+	// Always return a 32-byte big-endian integer.
+	ret := make([]byte, 32)
+	bigIntValue := big.NewInt(0)
+	bigIntValue.SetUint64(plaintext)
+	bigIntValue.FillBytes(ret)
+	return ret, nil
 }
 
 type faucet struct{}
