@@ -182,10 +182,13 @@ const (
 	FheUint16NegNotGas  uint64 = 108000
 	FheUint32NegNotGas  uint64 = 130000
 
-	// TODO: Cost will depend on the complexity of doing reencryption by the oracle.
+	// TODO: Costs will depend on the complexity of doing reencryption/decryption by the oracle.
 	FheUint8ReencryptGas  uint64 = 1000
 	FheUint16ReencryptGas uint64 = 1100
 	FheUint32ReencryptGas uint64 = 1200
+	FheUint8DecryptGas    uint64 = 600
+	FheUint16DecryptGas   uint64 = 700
+	FheUint32DecryptGas   uint64 = 800
 
 	// As of now, verification costs only cover ciphertext deserialization and assume there is no ZKPoK to verify.
 	FheUint8VerifyGas  uint64 = 200

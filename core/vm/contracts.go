@@ -92,6 +92,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -134,6 +135,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -177,6 +179,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -220,6 +223,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -263,6 +267,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{88}): &fheMax{},
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
+	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1436,6 +1441,12 @@ var fheReencryptGasCosts = map[fheUintType]uint64{
 	FheUint8:  params.FheUint8ReencryptGas,
 	FheUint16: params.FheUint16ReencryptGas,
 	FheUint32: params.FheUint32ReencryptGas,
+}
+
+var fheDecryptGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8DecryptGas,
+	FheUint16: params.FheUint16DecryptGas,
+	FheUint32: params.FheUint32DecryptGas,
 }
 
 var fheVerifyGasCosts = map[fheUintType]uint64{
@@ -3355,6 +3366,56 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 	}
 
 	return resHash.Bytes(), nil
+}
+
+type decrypt struct{}
+
+func (e *decrypt) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) != 32 {
+		logger.Error("decrypt RequiredGas() input len must be 32 bytes", "input", hex.EncodeToString(input), "len", len(input))
+		return 0
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		logger.Error("decrypt RequiredGas() input doesn't point to verified ciphertext", "input", hex.EncodeToString(input))
+		return 0
+	}
+	return fheDecryptGasCosts[ct.ciphertext.fheUintType]
+}
+
+func (e *decrypt) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	mode := strings.ToLower(tomlConfig.Oracle.Mode)
+	if mode != "oracle" {
+		msg := "non-oracle nodes cannot decrypt"
+		logger.Error(msg)
+		return nil, errors.New(msg)
+	}
+	if len(input) != 32 {
+		msg := "decrypt input len must be 32 bytes"
+		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
+		return nil, errors.New(msg)
+	}
+	// If we are doing gas estimation, skip decryption and return 0.
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return make([]byte, 32), nil
+	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
+	if ct == nil {
+		msg := "decrypt unverified handle"
+		logger.Error(msg, "input", hex.EncodeToString(input))
+		return nil, errors.New(msg)
+	}
+	plaintext, err := ct.ciphertext.decrypt()
+	if err != nil {
+		logger.Error("decrypt failed", "err", err)
+		return nil, err
+	}
+	// Always return a 32-byte big-endian integer.
+	ret := make([]byte, 32)
+	plaintext.FillBytes(ret)
+	return ret, nil
 }
 
 type faucet struct{}
