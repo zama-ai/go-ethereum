@@ -433,6 +433,7 @@ func newTestState() *statefulPrecompileAccessibleState {
 	s := new(statefulPrecompileAccessibleState)
 	interpreter := newTestInterpreter()
 	s.interpreter = interpreter
+	s.interpreter.testing = true
 	return s
 }
 
@@ -1444,6 +1445,330 @@ func FheNot(t *testing.T, fheUintType fheUintType, scalar bool) {
 	}
 }
 
+func Decrypt(t *testing.T, fheUintType fheUintType) {
+	var value uint64
+	switch fheUintType {
+	case FheUint8:
+		value = 2
+	case FheUint16:
+		value = 4283
+	case FheUint32:
+		value = 1333337
+	}
+	c := &decrypt{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, fheUintType).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 32 {
+		t.Fatalf("decrypt expected output len of 32, got %v", len(out))
+	}
+	result := big.Int{}
+	result.SetBytes(out)
+	if result.Uint64() != value {
+		t.Fatalf("decrypt result not equal to value, result %v != value %v", result.Uint64(), value)
+	}
+}
+
+func newStopOpcodeContract() *Contract {
+	addr := AccountRef{}
+	c := NewContract(addr, addr, big.NewInt(0), 100000)
+	c.Code = make([]byte, 1)
+	c.Code[0] = byte(STOP)
+	return c
+}
+
+func TestRequire(t *testing.T) {
+	var value uint64 = 1
+	c := &require{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+}
+
+func TestRequireRevert(t *testing.T) {
+	var value uint64 = 0
+	c := &require{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err == nil || err != ErrExecutionReverted {
+		t.Fatalf("require expected reversal on value 0")
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+}
+
+func TestOneTrueOptimisticRequire(t *testing.T) {
+	var value uint64 = 1
+	c := &optimisticRequire{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call the interpreter with a single STOP opcode and expect that the optimistic require doesn't revert.
+	out, err = state.interpreter.Run(newStopOpcodeContract(), make([]byte, 0), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if out != nil {
+		t.Fatalf("expected empty response")
+	}
+}
+
+func TestTwoTrueOptimisticRequires(t *testing.T) {
+	var value uint64 = 1
+	c := &optimisticRequire{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	hash = verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	out, err = c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call the interpreter with a single STOP opcode and expect that the optimistic require doesn't revert.
+	out, err = state.interpreter.Run(newStopOpcodeContract(), make([]byte, 0), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if out != nil {
+		t.Fatalf("expected empty response")
+	}
+}
+
+func TestOptimisticRequireTwiceOnSameCiphertext(t *testing.T) {
+	var value uint64 = 1
+	c := &optimisticRequire{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	ct := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8)
+	hash := ct.getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	out, err = c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call the interpreter with a single STOP opcode and expect that the optimistic require doesn't revert.
+	out, err = state.interpreter.Run(newStopOpcodeContract(), make([]byte, 0), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if out != nil {
+		t.Fatalf("expected empty response")
+	}
+}
+
+func TestOneFalseOptimisticRequire(t *testing.T) {
+	var value uint64 = 0
+	c := &optimisticRequire{}
+	depth := 0
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call the interpreter with a single STOP opcode and expect that the optimistic require reverts.
+	out, err = state.interpreter.Run(newStopOpcodeContract(), make([]byte, 0), readOnly)
+	if err == nil || err != ErrExecutionReverted {
+		t.Fatalf("require expected reversal on value 0")
+	} else if out != nil {
+		t.Fatalf("expected empty response")
+	}
+}
+
+func TestOneFalseAndOneTrueOptimisticRequire(t *testing.T) {
+	c := &optimisticRequire{}
+	depth := 0
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hash := verifyCiphertextInTestMemory(state.interpreter, 0, depth, FheUint8).getHash()
+	out, err := c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	hash = verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	out, err = c.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call the interpreter with a single STOP opcode and expect that the optimistic require reverts.
+	out, err = state.interpreter.Run(newStopOpcodeContract(), make([]byte, 0), readOnly)
+	if err == nil || err != ErrExecutionReverted {
+		t.Fatalf("require expected reversal on value 0")
+	} else if out != nil {
+		t.Fatalf("expected empty response")
+	}
+}
+
+func TestDecryptWithFalseOptimisticRequire(t *testing.T) {
+	opt := &optimisticRequire{}
+	dec := &decrypt{}
+	depth := 0
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	// Call optimistic require with a false value and expect it succeeds.
+	hash := verifyCiphertextInTestMemory(state.interpreter, 0, depth, FheUint8).getHash()
+	out, err := opt.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call decrypt and expect it to fail due to the optimistic require being false.
+	_, err = dec.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err == nil {
+		t.Fatalf("expected decrypt fails due to false optimistic require")
+	}
+	// Make sure there are no more optimistic requires after the decrypt call.
+	if len(state.interpreter.optimisticRequires) != 0 {
+		t.Fatalf("expected that there are no optimistic requires after decrypt")
+	}
+}
+
+func TestDecryptWithTrueOptimisticRequire(t *testing.T) {
+	opt := &optimisticRequire{}
+	dec := &decrypt{}
+	depth := 0
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	// Call optimistic require with a false value and expect it succeeds.
+	hash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	out, err := opt.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call decrypt and expect it to succeed due to the optimistic require being true.
+	out, err = dec.Run(state, addr, addr, hash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 32 {
+		t.Fatalf("decrypt expected output len of 32, got %v", len(out))
+	}
+	// Make sure there are no more optimistic requires after the decrypt call.
+	if len(state.interpreter.optimisticRequires) != 0 {
+		t.Fatalf("expected that there are no optimistic requires after decrypt")
+	}
+}
+
+func TestRequireWithFalseOptimisticRequire(t *testing.T) {
+	opt := &optimisticRequire{}
+	req := &require{}
+	depth := 0
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	// Call optimistic require with a false value and expect it succeeds.
+	optHash := verifyCiphertextInTestMemory(state.interpreter, 0, depth, FheUint8).getHash()
+	out, err := opt.Run(state, addr, addr, optHash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call require with a true value, but expect it to fail due to the optimistic require being false.
+	reqHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	_, err = req.Run(state, addr, addr, reqHash.Bytes(), readOnly)
+	if err == nil {
+		t.Fatalf("expected require fails due to false optimistic require")
+	}
+	// Make sure there are no more optimistic requires after the require call.
+	if len(state.interpreter.optimisticRequires) != 0 {
+		t.Fatalf("expected that there are no optimistic requires after require")
+	}
+}
+
+func TestRequireWithTrueOptimisticRequire(t *testing.T) {
+	opt := &optimisticRequire{}
+	req := &require{}
+	depth := 0
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	// Call optimistic require with a true value and expect it succeeds.
+	optHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	out, err := opt.Run(state, addr, addr, optHash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call require with a true value and expect it to succeed due to the optimistic require being true.
+	reqHash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	_, err = req.Run(state, addr, addr, reqHash.Bytes(), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	// Make sure there are no more optimistic requires after the require call.
+	if len(state.interpreter.optimisticRequires) != 0 {
+		t.Fatalf("expected that there are no optimistic requires after require")
+	}
+}
+
 func TestVerifyCiphertextInvalidType(t *testing.T) {
 	c := &verifyCiphertext{}
 	depth := 1
@@ -1937,6 +2262,18 @@ func TestFheScalarMax16(t *testing.T) {
 
 func TestFheScalarMax32(t *testing.T) {
 	FheMax(t, FheUint32, true)
+}
+
+func TestDecrypt8(t *testing.T) {
+	Decrypt(t, FheUint8)
+}
+
+func TestDecrypt16(t *testing.T) {
+	Decrypt(t, FheUint16)
+}
+
+func TestDecrypt32(t *testing.T) {
+	Decrypt(t, FheUint32)
 }
 
 func TestUnknownCiphertextHandle(t *testing.T) {
