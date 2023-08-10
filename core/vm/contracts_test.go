@@ -688,6 +688,54 @@ func FheMul(t *testing.T, fheUintType fheUintType, scalar bool) {
 	}
 }
 
+func FheDiv(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 4
+		rhs = 2
+	case FheUint16:
+		lhs = 721
+		rhs = 1000
+	case FheUint32:
+		lhs = 137
+		rhs = 17
+	}
+	expected := lhs / rhs
+	c := &fheDiv{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toPrecompileInput(scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	} else {
+		if err == nil {
+			t.Fatal("Non scalar multiplication should fail")
+		}
+	}
+}
+
 func FheBitAnd(t *testing.T, fheUintType fheUintType, scalar bool) {
 	var lhs, rhs uint64
 	switch fheUintType {
@@ -1926,6 +1974,30 @@ func TestFheScalarMul16(t *testing.T) {
 
 func TestFheScalarMul32(t *testing.T) {
 	FheMul(t, FheUint32, true)
+}
+
+func TestFheDiv8(t *testing.T) {
+	FheDiv(t, FheUint8, false)
+}
+
+func TestFheDiv16(t *testing.T) {
+	FheDiv(t, FheUint16, false)
+}
+
+func TestFheDiv32(t *testing.T) {
+	FheDiv(t, FheUint32, false)
+}
+
+func TestFheScalarDiv8(t *testing.T) {
+	FheDiv(t, FheUint8, true)
+}
+
+func TestFheScalarDiv16(t *testing.T) {
+	FheDiv(t, FheUint16, true)
+}
+
+func TestFheScalarDiv32(t *testing.T) {
+	FheDiv(t, FheUint32, true)
 }
 
 func TestFheBitAnd8(t *testing.T) {

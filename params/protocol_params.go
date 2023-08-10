@@ -166,6 +166,9 @@ const (
 	FheUint8MulGas      uint64 = 150000
 	FheUint16MulGas     uint64 = 200000
 	FheUint32MulGas     uint64 = 270000
+	FheUint8DivGas      uint64 = 1370000
+	FheUint16DivGas     uint64 = 3500000
+	FheUint32DivGas     uint64 = 9120000
 	FheUint8BitwiseGas  uint64 = 20000
 	FheUint16BitwiseGas uint64 = 21000
 	FheUint32BitwiseGas uint64 = 22000
