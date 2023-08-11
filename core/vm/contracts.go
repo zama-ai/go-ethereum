@@ -137,6 +137,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
+	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -181,6 +182,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
+	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -225,6 +227,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
+	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -269,6 +272,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
+	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
