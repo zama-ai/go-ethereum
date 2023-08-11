@@ -93,6 +93,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{89}): &fheNeg{},
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
+	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1406,6 +1407,12 @@ var fheMulGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32MulGas,
 }
 
+var fheDivGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8DivGas,
+	FheUint16: params.FheUint16DivGas,
+	FheUint32: params.FheUint32DivGas,
+}
+
 var fheShiftGasCosts = map[fheUintType]uint64{
 	FheUint8:  params.FheUint8ShiftGas,
 	FheUint16: params.FheUint16ShiftGas,
@@ -2228,6 +2235,70 @@ func (e *fheMul) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 		resultHash := result.getHash()
 		logger.Info("fheMul scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
+		return resultHash[:], nil
+	}
+}
+
+type fheDiv struct{}
+
+func (e *fheDiv) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	isScalar, err := isScalarOp(accessibleState, input)
+	if err != nil {
+		logger.Error("fheDiv RequiredGas() cannot detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
+		return 0
+	}
+	var lhs *verifiedCiphertext
+	if !isScalar {
+		logger.Error("fheDiv RequiredGas() only scalar in division is supported, two ciphertexts received", "input", hex.EncodeToString(input))
+		return 0
+	} else {
+		lhs, _, err = getScalarOperands(accessibleState, input)
+		if err != nil {
+			logger.Error("fheDiv RequiredGas() scalar inputs not verified", "err", err, "input", hex.EncodeToString(input))
+			return 0
+		}
+	}
+	return fheDivGasCosts[lhs.ciphertext.fheUintType]
+}
+
+func (e *fheDiv) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+
+	isScalar, err := isScalarOp(accessibleState, input)
+	if err != nil {
+		logger.Error("fheDiv cannot detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
+		return nil, err
+	}
+
+	if !isScalar {
+		err = errors.New("fheDiv supports only scalar input operation, two ciphertexts received")
+		logger.Error("fheDiv supports only scalar input operation, two ciphertexts received", "input", hex.EncodeToString(input))
+		return nil, err
+	} else {
+		lhs, rhs, err := getScalarOperands(accessibleState, input)
+		if err != nil {
+			logger.Error("fheDiv scalar inputs not verified", "err", err, "input", hex.EncodeToString(input))
+			return nil, err
+		}
+
+		// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+		if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+			return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+		}
+
+		result, err := lhs.ciphertext.scalarDiv(rhs.Uint64())
+		if err != nil {
+			logger.Error("fheDiv failed", "err", err)
+			return nil, err
+		}
+		importCiphertext(accessibleState, result)
+
+		// TODO: for testing
+		writeResult(result, "div_scalar_result", logger)
+
+		resultHash := result.getHash()
+		logger.Info("fheDiv scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
 		return resultHash[:], nil
 	}
 }
