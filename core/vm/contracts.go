@@ -3475,15 +3475,16 @@ func (e *decrypt) Run(accessibleState PrecompileAccessibleState, caller common.A
 		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
 		return nil, errors.New(msg)
 	}
-	// If we are doing gas estimation, skip decryption and return 0.
-	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return make([]byte, 32), nil
-	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
 	if ct == nil {
 		msg := "decrypt unverified handle"
 		logger.Error(msg, "input", hex.EncodeToString(input))
 		return nil, errors.New(msg)
+	}
+	// If we are doing gas estimation, skip decryption and make sure we return the maximum possible value.
+	// We need that, because non-zero bytes cost more than zero bytes in some contexts (e.g. SSTORE or memory operations).
+	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+		return bytes.Repeat([]byte{0xFF}, 32), nil
 	}
 	// Make sure we don't decrypt before any optimistic requires are checked.
 	optReqResult, optReqErr := evaluateRemainingOptimisticRequires(accessibleState.Interpreter())
