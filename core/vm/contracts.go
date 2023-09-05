@@ -70,7 +70,6 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
-	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
@@ -114,7 +113,6 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
-	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
@@ -159,7 +157,6 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
-	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
@@ -204,7 +201,6 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
-	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
@@ -249,7 +245,6 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{66}): &verifyCiphertext{},
 	common.BytesToAddress([]byte{67}): &reencrypt{},
 	common.BytesToAddress([]byte{68}): &fhePubKey{},
-	common.BytesToAddress([]byte{69}): &require{},
 	common.BytesToAddress([]byte{70}): &fheLe{},
 	common.BytesToAddress([]byte{71}): &fheSub{},
 	common.BytesToAddress([]byte{72}): &fheMul{},
@@ -1459,12 +1454,6 @@ var fheVerifyGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32VerifyGas,
 }
 
-var fheRequireGasCosts = map[fheUintType]uint64{
-	FheUint8:  params.FheUint8RequireGas,
-	FheUint16: params.FheUint16RequireGas,
-	FheUint32: params.FheUint32RequireGas,
-}
-
 var fheTrivialEncryptGasCosts = map[fheUintType]uint64{
 	FheUint8:  params.FheUint8TrivialEncryptGas,
 	FheUint16: params.FheUint16TrivialEncryptGas,
@@ -1701,6 +1690,13 @@ func (e *reencrypt) Run(accessibleState PrecompileAccessibleState, caller common
 	}
 	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
 	if ct != nil {
+		// Make sure we don't decrypt before any optimistic requires are checked.
+		optReqResult, optReqErr := evaluateRemainingOptimisticRequires(accessibleState.Interpreter())
+		if optReqErr != nil {
+			return nil, optReqErr
+		} else if !optReqResult {
+			return nil, ErrExecutionReverted
+		}
 		decryptedValue, err := ct.ciphertext.decrypt()
 		if err != nil {
 			logger.Error("reencrypt decryption failed", "err", err)
@@ -1867,57 +1863,6 @@ func evaluateRemainingOptimisticRequires(in *EVMInterpreter) (bool, error) {
 		return result != 0, err
 	}
 	return true, nil
-}
-
-type require struct{}
-
-func (e *require) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
-	logger := accessibleState.Interpreter().evm.Logger
-	if len(input) != 32 {
-		logger.Error("require RequiredGas() input len must be 32 bytes", "input", hex.EncodeToString(input), "len", len(input))
-		return 0
-	}
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
-	if ct == nil {
-		logger.Error("require RequiredGas() input doesn't point to verified ciphertext", "input", hex.EncodeToString(input))
-		return 0
-	}
-	return fheRequireGasCosts[ct.ciphertext.fheUintType]
-}
-
-func (e *require) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	logger := accessibleState.Interpreter().evm.Logger
-	if len(input) != 32 {
-		msg := "require input len must be 32 bytes"
-		logger.Error(msg, "input", hex.EncodeToString(input), "len", len(input))
-		return nil, errors.New(msg)
-	}
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input))
-	if ct == nil {
-		msg := "require unverified handle"
-		logger.Error(msg, "input", hex.EncodeToString(input))
-		return nil, errors.New(msg)
-	}
-	// If we are doing gas estimation, assume the require is true.
-	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
-		return nil, nil
-	}
-	// Make sure we don't decrypt before any optimistic requires are checked.
-	optReqResult, optReqErr := evaluateRemainingOptimisticRequires(accessibleState.Interpreter())
-	if optReqErr != nil {
-		return nil, optReqErr
-	} else if !optReqResult {
-		return nil, ErrExecutionReverted
-	}
-	value, err := decryptValue(ct.ciphertext, accessibleState.Interpreter())
-	if err != nil {
-		logger.Error("require failed to decrypt, reverting", "err", err)
-		return nil, err
-	} else if value == 0 {
-		logger.Error("require value is false, reverting")
-		return nil, ErrExecutionReverted
-	}
-	return nil, nil
 }
 
 type optimisticRequire struct{}
