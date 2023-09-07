@@ -211,8 +211,10 @@ const (
 	FheUint8OptimisticRequireGas       uint64 = FheUint8RequireGas
 	FheUint8OptimisticRequireBitandGas uint64 = FheUint8BitwiseGas
 
-	// TODO: This will change once we have an FHE-based random generaration with different types.
-	FheRandGas uint64 = NetSstoreCleanGas + ColdSloadCostEIP2929
+	// TODO: These will change once we have an FHE-based random generaration.
+	FheUint8RandGas  uint64 = NetSstoreInitGas + 1000
+	FheUint16RandGas uint64 = FheUint8RandGas + 1000
+	FheUint32RandGas uint64 = FheUint16RandGas + 1000
 
 	// TODO: The values here are chosen somewhat arbitrarily (at least the 8 bit ones). Also, we don't
 	// take into account whether a ciphertext existed (either "current" or "original") for the given handle.

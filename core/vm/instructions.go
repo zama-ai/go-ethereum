@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"sync/atomic"
@@ -674,8 +675,19 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 	interpreter.evm.StateDB.SetState(protectedStorage, val, metadata.serialize())
 }
 
+// A list of slots that we consider reserved in protected storage.
+// Namely, we won't treat them as ciphertext metadata and we won't garbage collect them.
+// TODO: This list will be removed when we change the way we handle ciphertext handles and refcounts.
+var reservedProtectedStorageSlots []common.Hash = make([]common.Hash, 0)
+
 // If references are still left, reduce refCount by 1. Otherwise, zero out the metadata and the ciphertext slots.
 func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
+	// If a reserved slot, do not try to garbage collect it.
+	for _, slot := range reservedProtectedStorageSlots {
+		if bytes.Equal(metadataKey.Bytes(), slot.Bytes()) {
+			return
+		}
+	}
 	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, metadataKey)
 	existingMetadataInt := newInt(existingMetadataHash.Bytes())
 	if !existingMetadataInt.IsZero() {
@@ -683,7 +695,7 @@ func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage co
 		metadata := newCiphertextMetadata(existingMetadataInt.Bytes32())
 		if metadata.refCount == 1 {
 			if interpreter.evm.Commit {
-				logger.Info("opSstore garbage-collecting ciphertext",
+				logger.Info("opSstore garbage collecting ciphertext",
 					"protectedStorage", hex.EncodeToString(protectedStorage[:]),
 					"metadataKey", hex.EncodeToString(metadataKey[:]),
 					"type", metadata.fheUintType,
