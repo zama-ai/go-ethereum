@@ -1523,6 +1523,30 @@ func Decrypt(t *testing.T, fheUintType fheUintType) {
 	}
 }
 
+func FheRand(t *testing.T, fheUintType fheUintType) {
+	c := &fheRand{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	out, err := c.Run(state, addr, addr, []byte{byte(fheUintType)}, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 32 {
+		t.Fatalf("fheRand expected output len of 32, got %v", len(out))
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 1 {
+		t.Fatalf("fheRand expected 1 verified ciphertext")
+	}
+
+	hash := common.BytesToHash(out)
+	_, err = state.interpreter.verifiedCiphertexts[hash].ciphertext.decrypt()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+}
+
 func newStopOpcodeContract() *Contract {
 	addr := AccountRef{}
 	c := NewContract(addr, addr, big.NewInt(0), 100000)
@@ -2348,6 +2372,18 @@ func TestDecrypt32(t *testing.T) {
 	Decrypt(t, FheUint32)
 }
 
+func TestFheRand8(t *testing.T) {
+	FheRand(t, FheUint8)
+}
+
+func TestFheRand16(t *testing.T) {
+	FheRand(t, FheUint16)
+}
+
+func TestFheRand32(t *testing.T) {
+	FheRand(t, FheUint32)
+}
+
 func TestUnknownCiphertextHandle(t *testing.T) {
 	depth := 1
 	state := newTestState()
@@ -2412,5 +2448,54 @@ func TestCiphertextVerificationConditions(t *testing.T) {
 	ct = getVerifiedCiphertext(state, hash)
 	if ct != nil {
 		t.Fatalf("expected that ciphertext is not verified at verifiedDepth - 1 (%d)", verifiedDepth-1)
+	}
+}
+
+func TestFheRandInvalidInput(t *testing.T) {
+	c := &fheRand{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	_, err := c.Run(state, addr, addr, []byte{}, readOnly)
+	if err == nil {
+		t.Fatalf("fheRand expected failure on invalid type")
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 0 {
+		t.Fatalf("fheRand expected 0 verified ciphertexts on invalid input")
+	}
+}
+
+func TestFheRandInvalidType(t *testing.T) {
+	c := &fheRand{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	_, err := c.Run(state, addr, addr, []byte{byte(254)}, readOnly)
+	if err == nil {
+		t.Fatalf("fheRand expected failure on invalid type")
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 0 {
+		t.Fatalf("fheRand expected 0 verified ciphertexts on invalid type")
+	}
+}
+
+func TestFheRandEthCall(t *testing.T) {
+	c := &fheRand{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.EthCall = true
+	addr := common.Address{}
+	readOnly := true
+	_, err := c.Run(state, addr, addr, []byte{byte(FheUint8)}, readOnly)
+	if err == nil {
+		t.Fatalf("fheRand expected failure on EthCall")
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 0 {
+		t.Fatalf("fheRand expected 0 verified ciphertexts on EthCall")
 	}
 }
