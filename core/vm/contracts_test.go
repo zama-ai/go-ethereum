@@ -469,6 +469,8 @@ func toPrecompileInput(isScalar bool, hashes ...common.Hash) []byte {
 	return ret
 }
 
+var scalarBytePadding = make([]byte, 31)
+
 func toLibPrecompileInput(method string, isScalar bool, hashes ...common.Hash) []byte {
 	ret := make([]byte, 0)
 	state := crypto.NewKeccakState()
@@ -485,10 +487,7 @@ func toLibPrecompileInput(method string, isScalar bool, hashes ...common.Hash) [
 		isScalarByte = 0
 	}
 	ret = append(ret, isScalarByte)
-	// padding
-	for i := 0; i < 31; i++ {
-		ret = append(ret, 0)
-	}
+	ret = append(ret, scalarBytePadding...)
 	return ret
 }
 
