@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -468,6 +469,29 @@ func toPrecompileInput(isScalar bool, hashes ...common.Hash) []byte {
 	return ret
 }
 
+func toLibPrecompileInput(method string, isScalar bool, hashes ...common.Hash) []byte {
+	ret := make([]byte, 0)
+	state := crypto.NewKeccakState()
+	hashRes := crypto.HashData(state, []byte(method))
+	signature := hashRes.Bytes()[0:4]
+	ret = append(ret, signature...)
+	for _, hash := range hashes {
+		ret = append(ret, hash.Bytes()...)
+	}
+	var isScalarByte byte
+	if isScalar {
+		isScalarByte = 1
+	} else {
+		isScalarByte = 0
+	}
+	ret = append(ret, isScalarByte)
+	// padding
+	for i := 0; i < 31; i++ {
+		ret = append(ret, 0)
+	}
+	return ret
+}
+
 func VerifyCiphertext(t *testing.T, fheUintType fheUintType) {
 	var value uint32
 	switch fheUintType {
@@ -559,6 +583,49 @@ func TrivialEncrypt(t *testing.T, fheUintType fheUintType) {
 	res := getVerifiedCiphertextFromEVM(state.interpreter, ct.getHash())
 	if res == nil {
 		t.Fatalf("verifyCiphertext must have verified given ciphertext")
+	}
+}
+
+func FheLibAdd(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs + rhs
+	c := &fheLib{}
+	signature := "fheAdd(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
 	}
 }
 
@@ -1836,6 +1903,10 @@ func TestVerifyCiphertextBadCiphertext(t *testing.T) {
 	if len(state.interpreter.verifiedCiphertexts) != 0 {
 		t.Fatalf("verifyCiphertext mustn't have verified given ciphertext")
 	}
+}
+
+func TestFheLibAdd8(t *testing.T) {
+	FheLibAdd(t, FheUint8, false)
 }
 
 func TestFheAdd8(t *testing.T) {

@@ -94,6 +94,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
+	common.BytesToAddress([]byte{93}): &fheLib{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -137,6 +138,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
+	common.BytesToAddress([]byte{93}): &fheLib{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -181,6 +183,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
+	common.BytesToAddress([]byte{93}): &fheLib{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -225,6 +228,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
+	common.BytesToAddress([]byte{93}): &fheLib{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -269,6 +273,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
+	common.BytesToAddress([]byte{93}): &fheLib{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1469,6 +1474,49 @@ var fheRandGasCosts = map[fheUintType]uint64{
 
 func writeResult(ct *tfheCiphertext, fileName string, logger Logger) {
 	os.WriteFile("/tmp/"+fileName, ct.serialize(), 0644)
+}
+
+type fheLib struct{}
+
+func (e *fheLib) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) < 4 {
+		err := errors.New("input must contain at least 4 bytes for method signature")
+		logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))
+		return 0
+	}
+	signature := binary.BigEndian.Uint32(input[0:4])
+	switch signature {
+	// first 4 bytes of keccak256('fheAdd(uint256,uint256,bytes1)')
+	case 0xf953e427:
+		bwCompatBytes := input[4:minInt(69, len(input))]
+		return (*fheAdd)(nil).RequiredGas(accessibleState, bwCompatBytes)
+	default:
+		err := errors.New("precompile method not found")
+		logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))
+		return 0
+	}
+}
+
+func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+	if len(input) < 4 {
+		err := errors.New("input must contain at least 4 bytes for method signature")
+		logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))
+		return nil, err
+	}
+	signature := binary.BigEndian.Uint32(input[0:4])
+	switch signature {
+	// first 4 bytes of keccak256('fheAdd(uint256,uint256,bytes1)')
+	case 0xf953e427:
+		bwCompatBytes := input[4:minInt(69, len(input))]
+		// state of fheAdd struct is never needed or accessed so we use nil
+		return (*fheAdd)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+	default:
+		err := errors.New("precompile method not found")
+		logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))
+		return nil, err
+	}
 }
 
 type fheAdd struct{}
