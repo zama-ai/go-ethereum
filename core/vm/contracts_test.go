@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -491,6 +492,18 @@ func toLibPrecompileInput(method string, isScalar bool, hashes ...common.Hash) [
 	return ret
 }
 
+func toLibPrecompileInputNoScalar(method string, hashes ...common.Hash) []byte {
+	ret := make([]byte, 0)
+	state := crypto.NewKeccakState()
+	hashRes := crypto.HashData(state, []byte(method))
+	signature := hashRes.Bytes()[0:4]
+	ret = append(ret, signature...)
+	for _, hash := range hashes {
+		ret = append(ret, hash.Bytes()...)
+	}
+	return ret
+}
+
 func VerifyCiphertext(t *testing.T, fheUintType fheUintType) {
 	var value uint32
 	switch fheUintType {
@@ -625,6 +638,1126 @@ func FheLibAdd(t *testing.T, fheUintType fheUintType, scalar bool) {
 	decrypted, err := res.ciphertext.decrypt()
 	if err != nil || decrypted.Uint64() != expected {
 		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibSub(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs - rhs
+	c := &fheLib{}
+	signature := "fheSub(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibMul(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 3
+		rhs = 2
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs * rhs
+	c := &fheLib{}
+	signature := "fheMul(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibLe(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	c := &fheLib{}
+	signature := "fheLe(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+
+	// lhs <= rhs
+	input1 := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 0 {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
+	}
+
+	// Inverting operands is only possible in the non scalar case as scalar
+	// operators expect the scalar to be on the rhs.
+	if !scalar {
+		// rhs <= lhs
+		input2 := toLibPrecompileInput(signature, false, rhsHash, lhsHash)
+		out, err = c.Run(state, addr, addr, input2, readOnly)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 1 {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
+		}
+	}
+}
+
+func FheLibLt(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+
+	c := &fheLib{}
+	signature := "fheLt(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+
+	// lhs < rhs
+	input1 := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 0 {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
+	}
+
+	// Inverting operands is only possible in the non scalar case as scalar
+	// operators expect the scalar to be on the rhs.
+	if !scalar {
+		// rhs < lhs
+		input2 := toLibPrecompileInput(signature, false, rhsHash, lhsHash)
+		out, err = c.Run(state, addr, addr, input2, readOnly)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 1 {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
+		}
+	}
+}
+
+func FheLibEq(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	c := &fheLib{}
+	signature := "fheLt(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	// lhs == rhs
+	input1 := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 0 {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
+	}
+}
+
+func FheLibGe(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	c := &fheLib{}
+	signature := "fheGe(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	// lhs >= rhs
+	input1 := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 1 {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
+	}
+	// Inverting operands is only possible in the non scalar case as scalar
+	// operators expect the scalar to be on the rhs.
+	if !scalar {
+		// rhs >= lhs
+		input2 := toLibPrecompileInput(signature, false, rhsHash, lhsHash)
+		out, err = c.Run(state, addr, addr, input2, readOnly)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 0 {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
+		}
+	}
+}
+
+func FheLibGt(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+
+	c := &fheLib{}
+	signature := "fheGt(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	// lhs > rhs
+	input1 := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 1 {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
+	}
+
+	// Inverting operands is only possible in the non scalar case as scalar
+	// operators expect the scalar to be on the rhs.
+	if !scalar {
+		// rhs > lhs
+		input2 := toLibPrecompileInput(signature, false, rhsHash, lhsHash)
+		out, err = c.Run(state, addr, addr, input2, readOnly)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != 0 {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 0)
+		}
+	}
+}
+
+func FheLibShl(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 2
+	case FheUint32:
+		lhs = 1333337
+		rhs = 3
+	}
+	expected := lhs << rhs
+	c := &fheLib{}
+	signature := "fheShl(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibShr(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 2
+	case FheUint32:
+		lhs = 1333337
+		rhs = 3
+	}
+	expected := lhs >> rhs
+	c := &fheLib{}
+	signature := "fheShr(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibNe(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	c := &fheLib{}
+	signature := "fheNe(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	// lhs == rhs
+	input1 := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input1, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != 1 {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), 1)
+	}
+}
+
+func FheLibMin(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+
+	c := &fheLib{}
+	signature := "fheMin(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != rhs {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), rhs)
+	}
+
+	// Inverting operands is only possible in the non scalar case as scalar
+	// operators expect the scalar to be on the rhs.
+	if !scalar {
+		input2 := toLibPrecompileInput(signature, false, rhsHash, lhsHash)
+		out, err = c.Run(state, addr, addr, input2, readOnly)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != rhs {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), rhs)
+		}
+	}
+}
+
+func FheLibMax(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+
+	c := &fheLib{}
+	signature := "fheMax(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != lhs {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), lhs)
+	}
+
+	// Inverting operands is only possible in the non scalar case as scalar
+	// operators expect the scalar to be on the rhs.
+	if !scalar {
+		input2 := toLibPrecompileInput(signature, false, rhsHash, lhsHash)
+		out, err = c.Run(state, addr, addr, input2, readOnly)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res = getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err = res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != lhs {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), lhs)
+		}
+	}
+}
+
+func FheLibNeg(t *testing.T, fheUintType fheUintType) {
+	var pt, expected uint64
+	switch fheUintType {
+	case FheUint8:
+		pt = 2
+		expected = uint64(-uint8(pt))
+	case FheUint16:
+		pt = 4283
+		expected = uint64(-uint16(pt))
+	case FheUint32:
+		pt = 1333337
+		expected = uint64(-uint32(pt))
+	}
+
+	c := &fheLib{}
+	signature := "fheNeg(uint256)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	ptHash := verifyCiphertextInTestMemory(state.interpreter, pt, depth, fheUintType).getHash()
+
+	input := toLibPrecompileInputNoScalar(signature, ptHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibNot(t *testing.T, fheUintType fheUintType) {
+	var pt, expected uint64
+	switch fheUintType {
+	case FheUint8:
+		pt = 2
+		expected = uint64(^uint8(pt))
+	case FheUint16:
+		pt = 4283
+		expected = uint64(^uint16(pt))
+	case FheUint32:
+		pt = 1333337
+		expected = uint64(^uint32(pt))
+	}
+
+	c := &fheLib{}
+	signature := "fheNot(uint256)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	ptHash := verifyCiphertextInTestMemory(state.interpreter, pt, depth, fheUintType).getHash()
+
+	input := toLibPrecompileInputNoScalar(signature, ptHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+	if res == nil {
+		t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+	}
+	decrypted, err := res.ciphertext.decrypt()
+	if err != nil || decrypted.Uint64() != expected {
+		t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+	}
+}
+
+func FheLibDiv(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 4
+		rhs = 2
+	case FheUint16:
+		lhs = 721
+		rhs = 1000
+	case FheUint32:
+		lhs = 137
+		rhs = 17
+	}
+	expected := lhs / rhs
+	c := &fheLib{}
+	signature := "fheDiv(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	} else {
+		if err == nil {
+			t.Fatal("Non scalar multiplication should fail")
+		}
+	}
+}
+
+func FheLibBitAnd(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs & rhs
+	c := &fheLib{}
+	signature := "fheBitAnd(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err == nil {
+			t.Fatalf("scalar bit and should have failed")
+		}
+	} else {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	}
+}
+
+func FheLibBitOr(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs | rhs
+	c := &fheLib{}
+	signature := "fheBitOr(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err == nil {
+			t.Fatalf("scalar bit or should have failed")
+		}
+	} else {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	}
+}
+
+func FheLibBitXor(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 2
+		rhs = 1
+	case FheUint16:
+		lhs = 4283
+		rhs = 1337
+	case FheUint32:
+		lhs = 1333337
+		rhs = 133337
+	}
+	expected := lhs ^ rhs
+	c := &fheLib{}
+	signature := "fheBitXor(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err == nil {
+			t.Fatalf("scalar bit xor should have failed")
+		}
+	} else {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	}
+}
+
+func FheLibRand(t *testing.T, fheUintType fheUintType) {
+	c := &fheLib{}
+	signature := "fheRand(bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	input := make([]byte, 0)
+	input = append(input, signatureBytes...)
+	input = append(input, byte(fheUintType))
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 32 {
+		t.Fatalf("fheRand expected output len of 32, got %v", len(out))
+	}
+	if len(state.interpreter.verifiedCiphertexts) != 1 {
+		t.Fatalf("fheRand expected 1 verified ciphertext")
+	}
+
+	hash := common.BytesToHash(out)
+	_, err = state.interpreter.verifiedCiphertexts[hash].ciphertext.decrypt()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+}
+
+func LibTrivialEncrypt(t *testing.T, fheUintType fheUintType) {
+	var value big.Int
+	switch fheUintType {
+	case FheUint8:
+		value = *big.NewInt(2)
+	case FheUint16:
+		value = *big.NewInt(4283)
+	case FheUint32:
+		value = *big.NewInt(1333337)
+	}
+	c := &fheLib{}
+	signature := "trivialEncrypt(uint256,bytes1)"
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	valueBytes := make([]byte, 32)
+	input := make([]byte, 0)
+	input = append(input, signatureBytes...)
+	input = append(input, value.FillBytes(valueBytes)...)
+	input = append(input, byte(fheUintType))
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	ct := new(tfheCiphertext).trivialEncrypt(value, fheUintType)
+	if common.BytesToHash(out) != ct.getHash() {
+		t.Fatalf("output hash in verifyCipertext is incorrect")
+	}
+	res := getVerifiedCiphertextFromEVM(state.interpreter, ct.getHash())
+	if res == nil {
+		t.Fatalf("verifyCiphertext must have verified given ciphertext")
+	}
+}
+
+func LibDecrypt(t *testing.T, fheUintType fheUintType) {
+	var value uint64
+	switch fheUintType {
+	case FheUint8:
+		value = 2
+	case FheUint16:
+		value = 4283
+	case FheUint32:
+		value = 1333337
+	}
+	c := &fheLib{}
+	signature := "decrypt(uint256)"
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	input := make([]byte, 0)
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, fheUintType).getHash()
+	input = append(input, signatureBytes...)
+	input = append(input, hash.Bytes()...)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 32 {
+		t.Fatalf("decrypt expected output len of 32, got %v", len(out))
+	}
+	result := big.Int{}
+	result.SetBytes(out)
+	if result.Uint64() != value {
+		t.Fatalf("decrypt result not equal to value, result %v != value %v", result.Uint64(), value)
+	}
+}
+
+func TestLibVerifyCiphertextInvalidType(t *testing.T) {
+	c := &fheLib{}
+	signature := "verifyCiphertext(bytes)"
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	invalidType := fheUintType(255)
+	input := make([]byte, 0)
+	input = append(input, signatureBytes...)
+	compact := encryptAndSerializeCompact(0, FheUint32)
+	input = append(input, compact...)
+	input = append(input, byte(invalidType))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err == nil {
+		t.Fatalf("verifyCiphertext must have failed on invalid ciphertext type")
+	}
+
+	if !strings.Contains(err.Error(), "ciphertext type is invalid") {
+		t.Fatalf("Unexpected test error: %s", err.Error())
+	}
+}
+
+func TestLibReencrypt(t *testing.T) {
+	c := &fheLib{}
+	signature := "reencrypt(uint256,uint256)"
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.EthCall = true
+	toEncrypt := 7
+	fheUintType := FheUint8
+	encCiphertext := verifyCiphertextInTestMemory(state.interpreter, uint64(toEncrypt), depth, fheUintType).getHash()
+	addr := common.Address{}
+	readOnly := false
+	input := make([]byte, 0)
+	input = append(input, signatureBytes...)
+	input = append(input, encCiphertext.Bytes()...)
+	// just append twice not to generate public key
+	input = append(input, encCiphertext.Bytes()...)
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf("Reencrypt error: %s", err.Error())
+	}
+}
+func TestLibOneTrueOptimisticRequire(t *testing.T) {
+	var value uint64 = 1
+	c := &fheLib{}
+	signature := "optimisticRequire(uint256)"
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	input := make([]byte, 0)
+	hash := verifyCiphertextInTestMemory(state.interpreter, value, depth, FheUint8).getHash()
+	input = append(input, signatureBytes...)
+	input = append(input, hash.Bytes()...)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if len(out) != 0 {
+		t.Fatalf("require expected output len of 0, got %v", len(out))
+	}
+	// Call the interpreter with a single STOP opcode and expect that the optimistic require doesn't revert.
+	out, err = state.interpreter.Run(newStopOpcodeContract(), make([]byte, 0), readOnly)
+	if err != nil {
+		t.Fatalf(err.Error())
+	} else if out != nil {
+		t.Fatalf("expected empty response")
+	}
+}
+
+func TestLibCast(t *testing.T) {
+	c := &fheLib{}
+	signature := "cast(uint256,bytes1)"
+	hashState := crypto.NewKeccakState()
+	hashRes := crypto.HashData(hashState, []byte(signature))
+	signatureBytes := hashRes.Bytes()[0:4]
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	state.interpreter.evm.EthCall = true
+	toEncrypt := 7
+	fheUintType := FheUint8
+	encCiphertext := verifyCiphertextInTestMemory(state.interpreter, uint64(toEncrypt), depth, fheUintType).getHash()
+	addr := common.Address{}
+	readOnly := false
+	input := make([]byte, 0)
+	input = append(input, signatureBytes...)
+	input = append(input, encCiphertext.Bytes()...)
+	input = append(input, byte(FheUint32))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err != nil {
+		t.Fatalf("Reencrypt error: %s", err.Error())
 	}
 }
 
@@ -1906,6 +3039,90 @@ func TestVerifyCiphertextBadCiphertext(t *testing.T) {
 
 func TestFheLibAdd8(t *testing.T) {
 	FheLibAdd(t, FheUint8, false)
+}
+
+func TestFheLibSub8(t *testing.T) {
+	FheLibSub(t, FheUint8, false)
+}
+
+func TestFheLibMul8(t *testing.T) {
+	FheLibMul(t, FheUint8, false)
+}
+
+func TestFheLibLe8(t *testing.T) {
+	FheLibLe(t, FheUint8, false)
+}
+
+func TestFheLibLt8(t *testing.T) {
+	FheLibLt(t, FheUint8, false)
+}
+
+func TestFheLibEq8(t *testing.T) {
+	FheLibEq(t, FheUint8, false)
+}
+
+func TestFheLibGe8(t *testing.T) {
+	FheLibGe(t, FheUint8, false)
+}
+
+func TestFheLibGt8(t *testing.T) {
+	FheLibGt(t, FheUint8, false)
+}
+
+func TestFheLibShl8(t *testing.T) {
+	FheLibShl(t, FheUint8, false)
+}
+
+func TestFheLibShr8(t *testing.T) {
+	FheLibShr(t, FheUint8, false)
+}
+
+func TestFheLibNe8(t *testing.T) {
+	FheLibNe(t, FheUint8, false)
+}
+
+func TestFheLibMin8(t *testing.T) {
+	FheLibMin(t, FheUint8, false)
+}
+
+func TestFheLibMax8(t *testing.T) {
+	FheLibMax(t, FheUint8, false)
+}
+
+func TestFheLibNeg8(t *testing.T) {
+	FheLibNeg(t, FheUint8)
+}
+
+func TestFheLibNot8(t *testing.T) {
+	FheLibNot(t, FheUint8)
+}
+
+func TestFheLibDiv8(t *testing.T) {
+	FheLibDiv(t, FheUint8, true)
+}
+
+func TestFheLibBitAnd8(t *testing.T) {
+	FheLibBitAnd(t, FheUint8, false)
+}
+
+func TestFheLibBitOr8(t *testing.T) {
+	FheLibBitOr(t, FheUint8, false)
+}
+
+func TestFheLibBitXor8(t *testing.T) {
+	FheLibBitXor(t, FheUint8, false)
+}
+
+func TestFheLibRand8(t *testing.T) {
+	FheLibRand(t, FheUint8)
+}
+
+func TestFheLibTrivialEncrypt8(t *testing.T) {
+	LibTrivialEncrypt(t, FheUint8)
+}
+
+func TestLibDecrypt8(t *testing.T) {
+	LibDecrypt(t, FheUint8)
 }
 
 func TestFheAdd8(t *testing.T) {
