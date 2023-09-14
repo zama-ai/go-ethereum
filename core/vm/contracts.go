@@ -1914,12 +1914,21 @@ func (e *verifyCiphertext) Run(accessibleState PrecompileAccessibleState, caller
 // Return a memory with a layout that matches the `bytes` EVM type, namely:
 //   - 32 byte integer in big-endian order as length
 //   - the actual bytes in the `bytes` value
+//   - add zero byte padding until nearest multiple of 32
 func toEVMBytes(input []byte) []byte {
-	len := uint64(len(input))
-	lenBytes32 := uint256.NewInt(len).Bytes32()
-	ret := make([]byte, 0, len+32)
+	arrLen := uint64(len(input))
+	lenBytes32 := uint256.NewInt(arrLen).Bytes32()
+	ret := make([]byte, 0, arrLen+32)
 	ret = append(ret, lenBytes32[:]...)
 	ret = append(ret, input...)
+	modRes := len(ret) % 32
+	if modRes > 0 {
+		padding := 32 - modRes
+		for padding > 0 {
+			padding--
+			ret = append(ret, 0x0)
+		}
+	}
 	return ret
 }
 
