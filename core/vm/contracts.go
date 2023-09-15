@@ -1721,7 +1721,7 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		outputBytes := make([]byte, 32, len(precompileBytes)+32)
 		outputBytes[31] = 0x20
 		outputBytes = append(outputBytes, precompileBytes...)
-		return outputBytes, nil
+		return padArrayTo32Multiple(outputBytes), nil
 	// first 4 bytes of keccak256('fhePubKey(bytes1)')
 	case 0xd9d47bb0:
 		bwCompatBytes := input[4:minInt(5, len(input))]
@@ -1733,7 +1733,7 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		outputBytes := make([]byte, 32, len(precompileBytes)+32)
 		outputBytes[31] = 0x20
 		outputBytes = append(outputBytes, precompileBytes...)
-		return outputBytes, nil
+		return padArrayTo32Multiple(outputBytes), nil
 	// first 4 bytes of keccak256('optimisticRequire(uint256)')
 	case 0x4ee071a1:
 		bwCompatBytes := input[4:minInt(36, len(input))]
@@ -1951,15 +1951,20 @@ func toEVMBytes(input []byte) []byte {
 	ret := make([]byte, 0, arrLen+32)
 	ret = append(ret, lenBytes32[:]...)
 	ret = append(ret, input...)
-	modRes := len(ret) % 32
+	return ret
+}
+
+// apply padding to slice to the multiple of 32
+func padArrayTo32Multiple(input []byte) []byte {
+	modRes := len(input) % 32
 	if modRes > 0 {
 		padding := 32 - modRes
 		for padding > 0 {
 			padding--
-			ret = append(ret, 0x0)
+			input = append(input, 0x0)
 		}
 	}
-	return ret
+	return input
 }
 
 type reencrypt struct{}
