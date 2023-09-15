@@ -1694,16 +1694,46 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		return (*fheRand)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('verifyCiphertext(bytes)')
 	case 0x4b252ec8:
-		bwCompatBytes := input[4:]
+		// first 32 bytes of the payload is offset, then 32 bytes are size of byte array
+		if len(input) <= 68 {
+			err := errors.New("verifyCiphertext(bytes) must contain at least 68 bytes for selector, byte offset and size")
+			logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))
+			return nil, err
+		}
+		bytesPaddingSize := 32
+		bytesSizeSlotSize := 32
+		// read only last 4 bytes of padded number for byte array size
+		sizeStart := 4 + bytesPaddingSize + bytesSizeSlotSize - 4
+		sizeEnd := sizeStart + 4
+		bytesSize := binary.BigEndian.Uint32(input[sizeStart:sizeEnd])
+		bytesStart := 4 + bytesPaddingSize + bytesSizeSlotSize
+		bytesEnd := bytesStart + int(bytesSize)
+		bwCompatBytes := input[bytesStart:minInt(bytesEnd, len(input))]
 		return (*verifyCiphertext)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('reencrypt(uint256,uint256)')
 	case 0xd6ad57cd:
 		bwCompatBytes := input[4:minInt(68, len(input))]
-		return (*reencrypt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		precompileBytes, err := (*reencrypt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		if err != nil {
+			return precompileBytes, err
+		}
+		// pad according to abi specification, first add offset to the dynamic bytes argument
+		outputBytes := make([]byte, 32, len(precompileBytes)+32)
+		outputBytes[31] = 0x20
+		outputBytes = append(outputBytes, precompileBytes...)
+		return outputBytes, nil
 	// first 4 bytes of keccak256('fhePubKey(bytes1)')
 	case 0xd9d47bb0:
 		bwCompatBytes := input[4:minInt(5, len(input))]
-		return (*fhePubKey)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		precompileBytes, err := (*fhePubKey)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		if err != nil {
+			return precompileBytes, err
+		}
+		// pad according to abi specification, first add offset to the dynamic bytes argument
+		outputBytes := make([]byte, 32, len(precompileBytes)+32)
+		outputBytes[31] = 0x20
+		outputBytes = append(outputBytes, precompileBytes...)
+		return outputBytes, nil
 	// first 4 bytes of keccak256('optimisticRequire(uint256)')
 	case 0x4ee071a1:
 		bwCompatBytes := input[4:minInt(36, len(input))]
