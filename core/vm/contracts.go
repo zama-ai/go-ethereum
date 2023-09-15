@@ -1476,6 +1476,38 @@ func writeResult(ct *tfheCiphertext, fileName string, logger Logger) {
 	os.WriteFile("/tmp/"+fileName, ct.serialize(), 0644)
 }
 
+func makeKeccakSignature(input string) uint32 {
+	return binary.BigEndian.Uint32(crypto.Keccak256([]byte(input))[0:4])
+}
+
+var signatureFheAdd = makeKeccakSignature("fheAdd(uint256,uint256,bytes1)")
+var signatureFheSub = makeKeccakSignature("fheSub(uint256,uint256,bytes1)")
+var signatureFheMul = makeKeccakSignature("fheMul(uint256,uint256,bytes1)")
+var signatureFheLe = makeKeccakSignature("fheLe(uint256,uint256,bytes1)")
+var signatureFheLt = makeKeccakSignature("fheLt(uint256,uint256,bytes1)")
+var signatureFheEq = makeKeccakSignature("fheEq(uint256,uint256,bytes1)")
+var signatureFheGe = makeKeccakSignature("fheGe(uint256,uint256,bytes1)")
+var signatureFheGt = makeKeccakSignature("fheGt(uint256,uint256,bytes1)")
+var signatureFheShl = makeKeccakSignature("fheShl(uint256,uint256,bytes1)")
+var signatureFheShr = makeKeccakSignature("fheShr(uint256,uint256,bytes1)")
+var signatureFheNe = makeKeccakSignature("fheNe(uint256,uint256,bytes1)")
+var signatureFheMin = makeKeccakSignature("fheMin(uint256,uint256,bytes1)")
+var signatureFheMax = makeKeccakSignature("fheMax(uint256,uint256,bytes1)")
+var signatureFheNeg = makeKeccakSignature("fheNeg(uint256)")
+var signatureFheNot = makeKeccakSignature("fheNot(uint256)")
+var signatureFheDiv = makeKeccakSignature("fheDiv(uint256,uint256,bytes1)")
+var signatureFheBitAnd = makeKeccakSignature("fheBitAnd(uint256,uint256,bytes1)")
+var signatureFheBitOr = makeKeccakSignature("fheBitOr(uint256,uint256,bytes1)")
+var signatureFheBitXor = makeKeccakSignature("fheBitXor(uint256,uint256,bytes1)")
+var signatureFheRand = makeKeccakSignature("fheRand(bytes1)")
+var signatureVerifyCiphertext = makeKeccakSignature("verifyCiphertext(bytes)")
+var signatureReencrypt = makeKeccakSignature("reencrypt(uint256,uint256)")
+var signatureFhePubKey = makeKeccakSignature("fhePubKey(bytes1)")
+var signatureOptimisticRequire = makeKeccakSignature("optimisticRequire(uint256)")
+var signatureCast = makeKeccakSignature("cast(uint256,bytes1)")
+var signatureTrivialEncrypt = makeKeccakSignature("trivialEncrypt(uint256,bytes1)")
+var signatureDecrypt = makeKeccakSignature("decrypt(uint256)")
+
 type fheLib struct{}
 
 func (e *fheLib) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
@@ -1488,113 +1520,113 @@ func (e *fheLib) RequiredGas(accessibleState PrecompileAccessibleState, input []
 	signature := binary.BigEndian.Uint32(input[0:4])
 	switch signature {
 	// first 4 bytes of keccak256('fheAdd(uint256,uint256,bytes1)')
-	case 0xf953e427:
+	case signatureFheAdd:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheAdd)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheAdd{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheSub(uint256,uint256,bytes1)')
-	case 0x8c14cc21:
+	case signatureFheSub:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheSub)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheSub{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheMul(uint256,uint256,bytes1)')
-	case 0x816d57d3:
+	case signatureFheMul:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheMul)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheMul{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheLe(uint256,uint256,bytes1)')
-	case 0x694daf72:
+	case signatureFheLe:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheLe)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheLe{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheLt(uint256,uint256,bytes1)')
-	case 0x9675211f:
+	case signatureFheLt:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheLt)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheLt{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheEq(uint256,uint256,bytes1)')
-	case 0x6be31758:
+	case signatureFheEq:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheEq)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheEq{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheGe(uint256,uint256,bytes1)')
-	case 0x052896f1:
+	case signatureFheGe:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheGe)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheGe{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheGt(uint256,uint256,bytes1)')
-	case 0x3e63c50a:
+	case signatureFheGt:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheGt)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheGt{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheShl(uint256,uint256,bytes1)')
-	case 0x89a4314b:
+	case signatureFheShl:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheShl)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheShl{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheShr(uint256,uint256,bytes1)')
-	case 0xeee1833c:
+	case signatureFheShr:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheShr)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheShr{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheNe(uint256,uint256,bytes1)')
-	case 0x19271081:
+	case signatureFheNe:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheNe)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheNe{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheMin(uint256,uint256,bytes1)')
-	case 0xa87deac4:
+	case signatureFheMin:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheMin)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheMin{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheMax(uint256,uint256,bytes1)')
-	case 0xa86e9de5:
+	case signatureFheMax:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheMax)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheMax{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheNeg(uint256)')
-	case 0xa8b42a89:
+	case signatureFheNeg:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*fheNeg)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheNeg{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheNot(uint256)')
-	case 0x13801ffa:
+	case signatureFheNot:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*fheNot)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheNot{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheDiv(uint256,uint256,bytes1)')
-	case 0x36cdd31b:
+	case signatureFheDiv:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheDiv)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheDiv{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheBitAnd(uint256,uint256,bytes1)')
-	case 0x666a3588:
+	case signatureFheBitAnd:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheBitAnd)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheBitAnd{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheBitOr(uint256,uint256,bytes1)')
-	case 0xec4057dc:
+	case signatureFheBitOr:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheBitOr)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheBitOr{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheBitXor(uint256,uint256,bytes1)')
-	case 0x2c7d67b7:
+	case signatureFheBitXor:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheBitXor)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheBitXor{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheRand(bytes1)')
-	case 0x900d294e:
+	case signatureFheRand:
 		bwCompatBytes := input[4:minInt(5, len(input))]
-		return (*fheRand)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fheRand{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('verifyCiphertext(bytes)')
-	case 0x4b252ec8:
+	case signatureVerifyCiphertext:
 		bwCompatBytes := input[4:]
-		return (*verifyCiphertext)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&verifyCiphertext{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('reencrypt(uint256,uint256)')
-	case 0xd6ad57cd:
+	case signatureReencrypt:
 		bwCompatBytes := input[4:minInt(68, len(input))]
-		return (*reencrypt)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&reencrypt{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fhePubKey(bytes1)')
-	case 0xd9d47bb0:
+	case signatureFhePubKey:
 		bwCompatBytes := input[4:minInt(5, len(input))]
-		return (*fhePubKey)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&fhePubKey{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('optimisticRequire(uint256)')
-	case 0x4ee071a1:
+	case signatureOptimisticRequire:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*optimisticRequire)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&optimisticRequire{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('cast(uint256,bytes1)')
-	case 0x4be68d20:
+	case signatureCast:
 		bwCompatBytes := input[4:minInt(37, len(input))]
-		return (*cast)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&cast{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('trivialEncrypt(uint256,bytes1)')
-	case 0xe71746b8:
+	case signatureTrivialEncrypt:
 		bwCompatBytes := input[4:minInt(37, len(input))]
-		return (*trivialEncrypt)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&trivialEncrypt{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('decrypt(uint256)')
-	case 0x5a4ee440:
+	case signatureDecrypt:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*decrypt)(nil).RequiredGas(accessibleState, bwCompatBytes)
+		return (&decrypt{}).RequiredGas(accessibleState, bwCompatBytes)
 	default:
 		err := errors.New("precompile method not found")
 		logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))
@@ -1612,88 +1644,88 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	signature := binary.BigEndian.Uint32(input[0:4])
 	switch signature {
 	// first 4 bytes of keccak256('fheAdd(uint256,uint256,bytes1)')
-	case 0xf953e427:
+	case signatureFheAdd:
 		bwCompatBytes := input[4:minInt(69, len(input))]
 		// state of fheAdd struct is never needed or accessed so we use nil
-		return (*fheAdd)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheAdd{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheSub(uint256,uint256,bytes1)')
-	case 0x8c14cc21:
+	case signatureFheSub:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheSub)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheSub{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheMul(uint256,uint256,bytes1)')
-	case 0x816d57d3:
+	case signatureFheMul:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheMul)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheMul{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheLe(uint256,uint256,bytes1)')
-	case 0x694daf72:
+	case signatureFheLe:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheLe)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheLe{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheLt(uint256,uint256,bytes1)')
-	case 0x9675211f:
+	case signatureFheLt:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheLt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheLt{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheEq(uint256,uint256,bytes1)')
-	case 0x6be31758:
+	case signatureFheEq:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheEq)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheEq{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheGe(uint256,uint256,bytes1)')
-	case 0x052896f1:
+	case signatureFheGe:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheGe)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheGe{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheGt(uint256,uint256,bytes1)')
-	case 0x3e63c50a:
+	case signatureFheGt:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheGt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheGt{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheShl(uint256,uint256,bytes1)')
-	case 0x89a4314b:
+	case signatureFheShl:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheShl)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheShl{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheShr(uint256,uint256,bytes1)')
-	case 0xeee1833c:
+	case signatureFheShr:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheShr)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheShr{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheNe(uint256,uint256,bytes1)')
-	case 0x19271081:
+	case signatureFheNe:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheNe)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheNe{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheMin(uint256,uint256,bytes1)')
-	case 0xa87deac4:
+	case signatureFheMin:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheMin)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheMin{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheMax(uint256,uint256,bytes1)')
-	case 0xa86e9de5:
+	case signatureFheMax:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheMax)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheMax{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheNeg(uint256)')
-	case 0xa8b42a89:
+	case signatureFheNeg:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*fheNeg)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheNeg{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheNot(uint256)')
-	case 0x13801ffa:
+	case signatureFheNot:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*fheNot)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheNot{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheDiv(uint256,uint256,bytes1)')
-	case 0x36cdd31b:
+	case signatureFheDiv:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheDiv)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheDiv{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheBitAnd(uint256,uint256,bytes1)')
-	case 0x666a3588:
+	case signatureFheBitAnd:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheBitAnd)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheBitAnd{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheBitOr(uint256,uint256,bytes1)')
-	case 0xec4057dc:
+	case signatureFheBitOr:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheBitOr)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheBitOr{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheBitXor(uint256,uint256,bytes1)')
-	case 0x2c7d67b7:
+	case signatureFheBitXor:
 		bwCompatBytes := input[4:minInt(69, len(input))]
-		return (*fheBitXor)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheBitXor{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheRand(bytes1)')
-	case 0x900d294e:
+	case signatureFheRand:
 		bwCompatBytes := input[4:minInt(5, len(input))]
-		return (*fheRand)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&fheRand{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('verifyCiphertext(bytes)')
-	case 0x4b252ec8:
+	case signatureVerifyCiphertext:
 		// first 32 bytes of the payload is offset, then 32 bytes are size of byte array
 		if len(input) <= 68 {
 			err := errors.New("verifyCiphertext(bytes) must contain at least 68 bytes for selector, byte offset and size")
@@ -1709,11 +1741,11 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		bytesStart := 4 + bytesPaddingSize + bytesSizeSlotSize
 		bytesEnd := bytesStart + int(bytesSize)
 		bwCompatBytes := input[bytesStart:minInt(bytesEnd, len(input))]
-		return (*verifyCiphertext)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&verifyCiphertext{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('reencrypt(uint256,uint256)')
-	case 0xd6ad57cd:
+	case signatureReencrypt:
 		bwCompatBytes := input[4:minInt(68, len(input))]
-		precompileBytes, err := (*reencrypt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		precompileBytes, err := (&reencrypt{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 		if err != nil {
 			return precompileBytes, err
 		}
@@ -1723,9 +1755,9 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		outputBytes = append(outputBytes, precompileBytes...)
 		return padArrayTo32Multiple(outputBytes), nil
 	// first 4 bytes of keccak256('fhePubKey(bytes1)')
-	case 0xd9d47bb0:
+	case signatureFhePubKey:
 		bwCompatBytes := input[4:minInt(5, len(input))]
-		precompileBytes, err := (*fhePubKey)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		precompileBytes, err := (&fhePubKey{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 		if err != nil {
 			return precompileBytes, err
 		}
@@ -1735,21 +1767,21 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 		outputBytes = append(outputBytes, precompileBytes...)
 		return padArrayTo32Multiple(outputBytes), nil
 	// first 4 bytes of keccak256('optimisticRequire(uint256)')
-	case 0x4ee071a1:
+	case signatureOptimisticRequire:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*optimisticRequire)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&optimisticRequire{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('cast(uint256,bytes1)')
-	case 0x4be68d20:
+	case signatureCast:
 		bwCompatBytes := input[4:minInt(37, len(input))]
-		return (*cast)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&cast{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('trivialEncrypt(uint256,bytes1)')
-	case 0xe71746b8:
+	case signatureTrivialEncrypt:
 		bwCompatBytes := input[4:minInt(37, len(input))]
-		return (*trivialEncrypt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&trivialEncrypt{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('decrypt(uint256)')
-	case 0x5a4ee440:
+	case signatureDecrypt:
 		bwCompatBytes := input[4:minInt(36, len(input))]
-		return (*decrypt)(nil).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+		return (&decrypt{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	default:
 		err := errors.New("precompile method not found")
 		logger.Error("fheLib precompile error", "err", err, "input", hex.EncodeToString(input))

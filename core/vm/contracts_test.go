@@ -474,9 +474,8 @@ var scalarBytePadding = make([]byte, 31)
 
 func toLibPrecompileInput(method string, isScalar bool, hashes ...common.Hash) []byte {
 	ret := make([]byte, 0)
-	state := crypto.NewKeccakState()
-	hashRes := crypto.HashData(state, []byte(method))
-	signature := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(method))
+	signature := hashRes[0:4]
 	ret = append(ret, signature...)
 	for _, hash := range hashes {
 		ret = append(ret, hash.Bytes()...)
@@ -494,9 +493,8 @@ func toLibPrecompileInput(method string, isScalar bool, hashes ...common.Hash) [
 
 func toLibPrecompileInputNoScalar(method string, hashes ...common.Hash) []byte {
 	ret := make([]byte, 0)
-	state := crypto.NewKeccakState()
-	hashRes := crypto.HashData(state, []byte(method))
-	signature := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(method))
+	signature := hashRes[0:4]
 	ret = append(ret, signature...)
 	for _, hash := range hashes {
 		ret = append(ret, hash.Bytes()...)
@@ -1554,9 +1552,8 @@ func FheLibRand(t *testing.T, fheUintType fheUintType) {
 	state.interpreter.evm.depth = depth
 	addr := common.Address{}
 	readOnly := false
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	input := make([]byte, 0)
 	input = append(input, signatureBytes...)
 	input = append(input, byte(fheUintType))
@@ -1589,9 +1586,8 @@ func LibTrivialEncrypt(t *testing.T, fheUintType fheUintType) {
 	}
 	c := &fheLib{}
 	signature := "trivialEncrypt(uint256,bytes1)"
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
@@ -1628,9 +1624,8 @@ func LibDecrypt(t *testing.T, fheUintType fheUintType) {
 	}
 	c := &fheLib{}
 	signature := "decrypt(uint256)"
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
@@ -1656,9 +1651,8 @@ func LibDecrypt(t *testing.T, fheUintType fheUintType) {
 func TestLibVerifyCiphertextInvalidType(t *testing.T) {
 	c := &fheLib{}
 	signature := "verifyCiphertext(bytes)"
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
@@ -1683,9 +1677,8 @@ func TestLibVerifyCiphertextInvalidType(t *testing.T) {
 func TestLibReencrypt(t *testing.T) {
 	c := &fheLib{}
 	signature := "reencrypt(uint256,uint256)"
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
@@ -1709,9 +1702,8 @@ func TestLibOneTrueOptimisticRequire(t *testing.T) {
 	var value uint64 = 1
 	c := &fheLib{}
 	signature := "optimisticRequire(uint256)"
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
@@ -1739,9 +1731,8 @@ func TestLibOneTrueOptimisticRequire(t *testing.T) {
 func TestLibCast(t *testing.T) {
 	c := &fheLib{}
 	signature := "cast(uint256,bytes1)"
-	hashState := crypto.NewKeccakState()
-	hashRes := crypto.HashData(hashState, []byte(signature))
-	signatureBytes := hashRes.Bytes()[0:4]
+	hashRes := crypto.Keccak256([]byte(signature))
+	signatureBytes := hashRes[0:4]
 	depth := 1
 	state := newTestState()
 	state.interpreter.evm.depth = depth
