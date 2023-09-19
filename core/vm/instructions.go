@@ -573,6 +573,11 @@ func verifyIfCiphertextHandle(val common.Hash, interpreter *EVMInterpreter, cont
 		return nil
 	}
 
+	// If a reserved slot, do not try treat it as ciphertext metadata.
+	if isReservedSlot(val) {
+		return nil
+	}
+
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(contractAddress)
 	metadataInt := newInt(interpreter.evm.StateDB.GetState(protectedStorage, val).Bytes())
 	if !metadataInt.IsZero() {
@@ -680,13 +685,20 @@ func persistIfVerifiedCiphertext(val common.Hash, protectedStorage common.Addres
 // TODO: This list will be removed when we change the way we handle ciphertext handles and refcounts.
 var reservedProtectedStorageSlots []common.Hash = make([]common.Hash, 0)
 
+func isReservedSlot(key common.Hash) bool {
+	for _, slot := range reservedProtectedStorageSlots {
+		if bytes.Equal(key.Bytes(), slot.Bytes()) {
+			return true
+		}
+	}
+	return false
+}
+
 // If references are still left, reduce refCount by 1. Otherwise, zero out the metadata and the ciphertext slots.
 func garbageCollectProtectedStorage(metadataKey common.Hash, protectedStorage common.Address, interpreter *EVMInterpreter) {
 	// If a reserved slot, do not try to garbage collect it.
-	for _, slot := range reservedProtectedStorageSlots {
-		if bytes.Equal(metadataKey.Bytes(), slot.Bytes()) {
-			return
-		}
+	if isReservedSlot(metadataKey) {
+		return
 	}
 	existingMetadataHash := interpreter.evm.StateDB.GetState(protectedStorage, metadataKey)
 	existingMetadataInt := newInt(existingMetadataHash.Bytes())
