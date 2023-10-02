@@ -1082,13 +1082,6 @@ func opReturn(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 			// If a handle is returned, automatically make it available to the caller.
 			verifiedCiphertext.verifiedDepths.add(interpreter.evm.depth - 1)
 		}
-		if interpreter.evm.Commit {
-			interpreter.evm.Logger.Info("opReturn removing ciphertext from depth",
-				"handle", verifiedCiphertext.ciphertext.getHash().Hex(),
-				"depth", interpreter.evm.depth)
-		}
-		// Delete the current EVM depth. Do that after the `isVerifiedAtCurrentDepth()` check.
-		verifiedCiphertext.verifiedDepths.del(interpreter.evm.depth)
 	}
 
 	return ret, errStopToken

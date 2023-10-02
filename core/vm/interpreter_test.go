@@ -75,3 +75,46 @@ func TestLoopInterrupt(t *testing.T) {
 	}
 
 }
+
+// Generates a contract that reverts immediately.
+func newRevertingContract() *Contract {
+	addr := AccountRef{}
+	c := NewContract(addr, addr, big.NewInt(0), 100000)
+	c.Code = make([]byte, 5)
+	c.Code[0] = byte(PUSH1)
+	c.Code[1] = byte(0)
+	c.Code[2] = byte(PUSH1)
+	c.Code[3] = byte(0)
+	c.Code[4] = byte(REVERT)
+	return c
+}
+
+func TestDepthRemovalOnRevert(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	evm := NewEVM(BlockContext{}, TxContext{}, statedb, params.AllEthashProtocolChanges, Config{})
+	evm.depth = 1 // simulate first "call"
+
+	contract := newRevertingContract()
+
+	h := common.BytesToHash([]byte("1337"))
+
+	verifiedCt := verifiedCiphertext{
+		newDepthSet(),
+		&tfheCiphertext{
+			make([]byte, 0),
+			&h,
+			FheUint8,
+		},
+	}
+	verifiedCt.verifiedDepths.add(1)
+	verifiedCt.verifiedDepths.add(2) // simulate passing `h` as a call argument to `contract`
+
+	evm.interpreter.verifiedCiphertexts[h] = &verifiedCt
+
+	evm.interpreter.Run(contract, make([]byte, 0), false)
+
+	resultingVerifiedDepths := evm.interpreter.verifiedCiphertexts[h].verifiedDepths
+	if resultingVerifiedDepths.has(2) {
+		t.Fatalf("verified depth should have been removed after revert")
+	}
+}
