@@ -165,7 +165,18 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 
 	// Increment the call depth which is restricted to 1024
 	in.evm.depth++
-	defer func() { in.evm.depth-- }()
+	defer func() {
+		for _, verifiedCiphertext := range in.verifiedCiphertexts {
+			if in.evm.Commit {
+				in.evm.Logger.Info("Run removing ciphertext from depth",
+					"handle", verifiedCiphertext.ciphertext.getHash().Hex(),
+					"depth", in.evm.depth)
+			}
+			// Delete the current EVM depth from the set of verified depths.
+			verifiedCiphertext.verifiedDepths.del(in.evm.depth)
+		}
+		in.evm.depth--
+	}()
 
 	// Make sure the readOnly is only set if we aren't in readOnly yet.
 	// This also makes sure that the readOnly flag isn't removed for child calls.

@@ -978,9 +978,6 @@ func TestOpReturnDelegation(t *testing.T) {
 	if !bytes.Equal(ct.serialize(), ctAfterOp.ciphertext.serialize()) {
 		t.Fatalf("expected ciphertext after the return op is the same as original")
 	}
-	if ctAfterOp.verifiedDepths.count() != 1 || !ctAfterOp.verifiedDepths.has(interpreter.evm.depth) {
-		t.Fatalf("expected ciphertext to be verified only at depth - 1 after the return op")
-	}
 }
 
 func TestOpReturnUnverifyIfNotReturned(t *testing.T) {
