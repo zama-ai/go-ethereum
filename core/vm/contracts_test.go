@@ -2957,6 +2957,40 @@ func TestVerifyCiphertextInvalidType(t *testing.T) {
 	}
 }
 
+func TestTrivialEncryptInvalidType(t *testing.T) {
+	c := &trivialEncrypt{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	invalidType := fheUintType(255)
+	input := make([]byte, 32)
+	input = append(input, byte(invalidType))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err == nil {
+		t.Fatalf("trivialEncrypt must have failed on invalid ciphertext type")
+	}
+}
+
+func TestCastInvalidType(t *testing.T) {
+	c := &cast{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	invalidType := fheUintType(255)
+	hash := verifyCiphertextInTestMemory(state.interpreter, 1, depth, FheUint8).getHash()
+	input := make([]byte, 0)
+	input = append(input, hash.Bytes()...)
+	input = append(input, byte(invalidType))
+	_, err := c.Run(state, addr, addr, input, readOnly)
+	if err == nil {
+		t.Fatalf("cast must have failed on invalid ciphertext type")
+	}
+}
+
 func TestVerifyCiphertextInvalidSize(t *testing.T) {
 	c := &verifyCiphertext{}
 	depth := 1

@@ -766,6 +766,58 @@ func TestProtectedStorageSstoreSload(t *testing.T) {
 	}
 }
 
+func TestProtectedStorageGarbageCollectionNoFlaggedLocation(t *testing.T) {
+	pc := uint64(0)
+	depth := 1
+	interpreter := newTestInterpreter()
+	interpreter.evm.depth = depth
+	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
+	scope := newTestScopeConext()
+	loc := uint256.NewInt(10)
+	locHash := common.BytesToHash(loc.Bytes())
+	value := uint256FromBig(ctHash.Big())
+	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
+
+	// Persist the ciphertext in protected storage.
+	scope.Stack.push(value)
+	scope.Stack.push(loc)
+	_, err := opSstore(&pc, interpreter, scope)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	// Set location flag to zero, such that garbage collection doesn't happen.
+	flagHandleLocation := crypto.Keccak256Hash(crypto.Keccak256Hash(locHash.Bytes()).Bytes())
+	interpreter.evm.StateDB.SetState(protectedStorage, flagHandleLocation, zero)
+
+	// Overwrite the ciphertext handle with 0.
+	scope.Stack.push(uint256.NewInt(0))
+	scope.Stack.push(loc)
+	_, err = opSstore(&pc, interpreter, scope)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	// Verify that garbage collection hasn't happened.
+	metadata := ciphertextMetadata{}
+	metadataKey := crypto.Keccak256Hash(ctHash.Bytes())
+	metadata.deserialize(interpreter.evm.StateDB.GetState(protectedStorage, metadataKey))
+	slot := uint256FromBig(metadataKey.Big())
+	slot = slot.AddUint64(slot, 1)
+	foundNonZero := false
+	for i := uint64(0); i < metadata.length; i++ {
+		res := interpreter.evm.StateDB.GetState(protectedStorage, common.BytesToHash(slot.Bytes()))
+		if !bytes.Equal(res.Bytes(), zero.Bytes()) {
+			foundNonZero = true
+			break
+		}
+		slot = slot.AddUint64(slot, i)
+	}
+	if !foundNonZero {
+		t.Fatalf("garbage collection must not have happened")
+	}
+}
+
 func TestProtectedStorageGarbageCollection(t *testing.T) {
 	pc := uint64(0)
 	depth := 1
@@ -774,6 +826,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	ctHash := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
 	scope := newTestScopeConext()
 	loc := uint256.NewInt(10)
+	locHash := common.BytesToHash(loc.Bytes())
 	value := uint256FromBig(ctHash.Big())
 
 	// Persist the ciphertext in protected storage.
@@ -787,7 +840,8 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	// Make sure ciphertext is persisted to protected storage.
 	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
 	metadata := ciphertextMetadata{}
-	metadata.deserialize(interpreter.evm.StateDB.GetState(protectedStorage, ctHash))
+	metadataKey := crypto.Keccak256Hash(ctHash.Bytes())
+	metadata.deserialize(interpreter.evm.StateDB.GetState(protectedStorage, metadataKey))
 	if metadata.refCount != 1 {
 		t.Fatalf("metadata.refcount of ciphertext is not 1")
 	}
@@ -795,7 +849,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 		t.Fatalf("metadata.length (%v) != ciphertext len (%v)", metadata.length, uint64(expandedFheCiphertextSize[FheUint8]))
 	}
 	ciphertextLocationsToCheck := (metadata.length + 32 - 1) / 32
-	startOfCiphertext := newInt(ctHash[:])
+	startOfCiphertext := newInt(metadataKey.Bytes())
 	startOfCiphertext.AddUint64(startOfCiphertext, 1)
 	ctIdx := startOfCiphertext
 	foundNonZero := false
@@ -812,6 +866,13 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 		t.Fatalf("ciphertext is not persisted to protected storage")
 	}
 
+	// Check if the handle location is flagged in protected storage.
+	flagHandleLocation := crypto.Keccak256Hash(crypto.Keccak256Hash(locHash.Bytes()).Bytes())
+	foundFlag := interpreter.evm.StateDB.GetState(protectedStorage, flagHandleLocation)
+	if !bytes.Equal(foundFlag.Bytes(), flag.Bytes()) {
+		t.Fatalf("location flag not persisted to protected storage")
+	}
+
 	// Overwrite the ciphertext handle with 0.
 	scope.Stack.push(uint256.NewInt(0))
 	scope.Stack.push(loc)
@@ -821,7 +882,7 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	}
 
 	// Make sure the metadata and the ciphertext are garbage collected from protected storage.
-	protectedStorageIdx := newInt(ctHash[:])
+	protectedStorageIdx := newInt(metadataKey.Bytes())
 	foundNonZero = false
 	for i := uint64(0); i < ciphertextLocationsToCheck; i++ {
 		c := interpreter.evm.StateDB.GetState(protectedStorage, common.BytesToHash(protectedStorageIdx.Bytes()))
@@ -835,97 +896,11 @@ func TestProtectedStorageGarbageCollection(t *testing.T) {
 	if foundNonZero {
 		t.Fatalf("ciphertext is not garbage collected from protected storage")
 	}
-}
 
-func TestProtectedStorageGarbageCollectionOnReservedSlot(t *testing.T) {
-	scope := newTestScopeConext()
-	protectedStorage := crypto.CreateProtectedStorageContractAddress(scope.Contract.Address())
-	interpreter := newTestInterpreter()
-	pc := uint64(0)
-	depth := 1
-	interpreter.evm.depth = depth
-
-	// Simulate metadata for a ciphertext at a reserved protected storage slot.
-	metadata := ciphertextMetadata{}
-	metadata.fheUintType = FheUint8
-	metadata.refCount = 1
-	metadata.length = 3
-	metadataSer := metadata.serialize()
-	metadataSlot := reservedProtectedStorageSlots[0]
-	interpreter.evm.StateDB.SetState(protectedStorage, metadataSlot, common.BytesToHash(metadataSer[:]))
-
-	// Simulate a ciphertext in protected storage.
-	slot := uint256FromBig(metadataSlot.Big())
-	nonZero := common.Hash{}
-	nonZero[0] = 1
-	for i := uint64(1); i < metadata.length+1; i++ {
-		slot = slot.AddUint64(slot, i)
-		interpreter.evm.StateDB.SetState(protectedStorage, common.BytesToHash(slot.Bytes()), nonZero)
-	}
-
-	// Simulate SSTORE with a new value that is different the reserved slot.
-	valueHash := metadataSlot
-	valueHash[0]++
-	loc := uint256.NewInt(10)
-	value := uint256FromBig(valueHash.Big())
-
-	// Call SSTORE.
-	scope.Stack.push(value)
-	scope.Stack.push(loc)
-	_, err := opSstore(&pc, interpreter, scope)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	// Verify that garbage collection hasn't happened for a reserved protected storage slot.
-	slot = uint256FromBig(metadataSlot.Big())
-	for i := uint64(0); i < metadata.length+1; i++ {
-		slot = slot.AddUint64(slot, i)
-		res := interpreter.evm.StateDB.GetState(protectedStorage, common.BytesToHash(slot.Bytes()))
-		if bytes.Equal(res.Bytes(), common.Hash{}.Bytes()) {
-			t.Fatalf("garbage collection must not have happened")
-		}
-	}
-}
-
-func TestProtectedStorageSloadOnReservedSlot(t *testing.T) {
-	scope := newTestScopeConext()
-	interpreter := newTestInterpreter()
-	pc := uint64(0)
-	depth := 1
-	interpreter.evm.depth = depth
-
-	handle := verifyCiphertextInTestMemory(interpreter, 2, depth, FheUint8).getHash()
-	loc := uint256.NewInt(10)
-	value := uint256FromBig(handle.Big())
-
-	// Consider the returned handle as a reserved slot.
-	reservedProtectedStorageSlots = append(reservedProtectedStorageSlots, handle)
-
-	// Persist the ciphertext in protected storage.
-	scope.Stack.push(value)
-	scope.Stack.push(loc)
-	_, err := opSstore(&pc, interpreter, scope)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	// Clear verified ciphertexts.
-	interpreter.verifiedCiphertexts = make(map[common.Hash]*verifiedCiphertext)
-
-	// Call SLOAD.
-	scope.Stack.push(loc)
-	_, err = opSload(&pc, interpreter, scope)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	// Remove the handle from reserved slots.
-	reservedProtectedStorageSlots = reservedProtectedStorageSlots[:len(reservedProtectedStorageSlots)-1]
-
-	// Expect no verified ciphertexts.
-	if len(interpreter.verifiedCiphertexts) != 0 {
-		t.Fatalf("expected no verified ciphetexts")
+	// Make sure the flag location is zero.
+	foundFlag = interpreter.evm.StateDB.GetState(protectedStorage, flagHandleLocation)
+	if !bytes.Equal(foundFlag.Bytes(), zero.Bytes()) {
+		t.Fatalf("location flag is not set to zero on garbage collection")
 	}
 }
 

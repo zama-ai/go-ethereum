@@ -3619,9 +3619,6 @@ func init() {
 	for i := range globalRngSeed {
 		globalRngSeed[i] = byte(1 + i)
 	}
-
-	// Make sure we mark the RNG nonce key as a reserved slot in protected storage.
-	reservedProtectedStorageSlots = append(reservedProtectedStorageSlots, common.BytesToHash(rngNonceKey[:]))
 }
 
 func (e *fheRand) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
@@ -3710,6 +3707,11 @@ func (e *cast) RequiredGas(accessibleState PrecompileAccessibleState, input []by
 			"len", len(input))
 		return 0
 	}
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if ct == nil {
+		accessibleState.Interpreter().evm.Logger.Error("cast input not verified")
+		return 0
+	}
 	return params.FheCastGas
 }
 
@@ -3722,17 +3724,17 @@ func (e *cast) Run(accessibleState PrecompileAccessibleState, caller common.Addr
 		return nil, errors.New(msg)
 	}
 
-	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
-	if ct == nil {
-		logger.Error("cast input not verified")
-		return nil, errors.New("unverified ciphertext handle")
-	}
-
 	if !isValidType(input[32]) {
 		logger.Error("invalid type to cast to")
 		return nil, errors.New("invalid type provided")
 	}
 	castToType := fheUintType(input[32])
+
+	ct := getVerifiedCiphertext(accessibleState, common.BytesToHash(input[0:32]))
+	if ct == nil {
+		logger.Error("cast input not verified")
+		return nil, errors.New("unverified ciphertext handle")
+	}
 
 	// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
 	if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
@@ -3865,8 +3867,13 @@ func (e *trivialEncrypt) Run(accessibleState PrecompileAccessibleState, caller c
 		return nil, errors.New(msg)
 	}
 
-	valueToEncrypt := *new(big.Int).SetBytes(input[0:32])
+	if !isValidType(input[32]) {
+		msg := "trivialEncrypt ciphertext type is invalid"
+		logger.Error(msg, "type", input[32])
+		return nil, errors.New(msg)
+	}
 	encryptToType := fheUintType(input[32])
+	valueToEncrypt := *new(big.Int).SetBytes(input[0:32])
 
 	ct := new(tfheCiphertext).trivialEncrypt(valueToEncrypt, encryptToType)
 
