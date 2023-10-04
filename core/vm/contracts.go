@@ -95,6 +95,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{91}): &decrypt{},           // lib
 	common.BytesToAddress([]byte{92}): &fheDiv{},            // lib
 	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -139,6 +140,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -184,6 +186,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -229,6 +232,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -274,6 +278,7 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
 	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
 
@@ -1418,6 +1423,12 @@ var fheDivGasCosts = map[fheUintType]uint64{
 	FheUint32: params.FheUint32DivGas,
 }
 
+var fheRemGasCosts = map[fheUintType]uint64{
+	FheUint8:  params.FheUint8RemGas,
+	FheUint16: params.FheUint16RemGas,
+	FheUint32: params.FheUint32RemGas,
+}
+
 var fheShiftGasCosts = map[fheUintType]uint64{
 	FheUint8:  params.FheUint8ShiftGas,
 	FheUint16: params.FheUint16ShiftGas,
@@ -1496,6 +1507,7 @@ var signatureFheMax = makeKeccakSignature("fheMax(uint256,uint256,bytes1)")
 var signatureFheNeg = makeKeccakSignature("fheNeg(uint256)")
 var signatureFheNot = makeKeccakSignature("fheNot(uint256)")
 var signatureFheDiv = makeKeccakSignature("fheDiv(uint256,uint256,bytes1)")
+var signatureFheRem = makeKeccakSignature("fheRem(uint256,uint256,bytes1)")
 var signatureFheBitAnd = makeKeccakSignature("fheBitAnd(uint256,uint256,bytes1)")
 var signatureFheBitOr = makeKeccakSignature("fheBitOr(uint256,uint256,bytes1)")
 var signatureFheBitXor = makeKeccakSignature("fheBitXor(uint256,uint256,bytes1)")
@@ -1583,6 +1595,10 @@ func (e *fheLib) RequiredGas(accessibleState PrecompileAccessibleState, input []
 	case signatureFheDiv:
 		bwCompatBytes := input[4:minInt(69, len(input))]
 		return (&fheDiv{}).RequiredGas(accessibleState, bwCompatBytes)
+	// first 4 bytes of keccak256('fheRem(uint256,uint256,bytes1)')
+	case signatureFheRem:
+		bwCompatBytes := input[4:minInt(69, len(input))]
+		return (&fheRem{}).RequiredGas(accessibleState, bwCompatBytes)
 	// first 4 bytes of keccak256('fheBitAnd(uint256,uint256,bytes1)')
 	case signatureFheBitAnd:
 		bwCompatBytes := input[4:minInt(69, len(input))]
@@ -1708,6 +1724,10 @@ func (e *fheLib) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 	case signatureFheDiv:
 		bwCompatBytes := input[4:minInt(69, len(input))]
 		return (&fheDiv{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
+	// first 4 bytes of keccak256('fheRem(uint256,uint256,bytes1)')
+	case signatureFheRem:
+		bwCompatBytes := input[4:minInt(69, len(input))]
+		return (&fheRem{}).Run(accessibleState, caller, addr, bwCompatBytes, readOnly)
 	// first 4 bytes of keccak256('fheBitAnd(uint256,uint256,bytes1)')
 	case signatureFheBitAnd:
 		bwCompatBytes := input[4:minInt(69, len(input))]
@@ -2587,6 +2607,70 @@ func (e *fheDiv) Run(accessibleState PrecompileAccessibleState, caller common.Ad
 
 		resultHash := result.getHash()
 		logger.Info("fheDiv scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
+		return resultHash[:], nil
+	}
+}
+
+type fheRem struct{}
+
+func (e *fheRem) RequiredGas(accessibleState PrecompileAccessibleState, input []byte) uint64 {
+	logger := accessibleState.Interpreter().evm.Logger
+	isScalar, err := isScalarOp(accessibleState, input)
+	if err != nil {
+		logger.Error("fheRem RequiredGas() cannot detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
+		return 0
+	}
+	var lhs *verifiedCiphertext
+	if !isScalar {
+		logger.Error("fheRem RequiredGas() only scalar in division is supported, two ciphertexts received", "input", hex.EncodeToString(input))
+		return 0
+	} else {
+		lhs, _, err = getScalarOperands(accessibleState, input)
+		if err != nil {
+			logger.Error("fheRem RequiredGas() scalar inputs not verified", "err", err, "input", hex.EncodeToString(input))
+			return 0
+		}
+	}
+	return fheRemGasCosts[lhs.ciphertext.fheUintType]
+}
+
+func (e *fheRem) Run(accessibleState PrecompileAccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+	logger := accessibleState.Interpreter().evm.Logger
+
+	isScalar, err := isScalarOp(accessibleState, input)
+	if err != nil {
+		logger.Error("fheRem cannot detect if operator is meant to be scalar", "err", err, "input", hex.EncodeToString(input))
+		return nil, err
+	}
+
+	if !isScalar {
+		err = errors.New("fheRem supports only scalar input operation, two ciphertexts received")
+		logger.Error("fheRem supports only scalar input operation, two ciphertexts received", "input", hex.EncodeToString(input))
+		return nil, err
+	} else {
+		lhs, rhs, err := getScalarOperands(accessibleState, input)
+		if err != nil {
+			logger.Error("fheRem scalar inputs not verified", "err", err, "input", hex.EncodeToString(input))
+			return nil, err
+		}
+
+		// If we are doing gas estimation, skip execution and insert a random ciphertext as a result.
+		if !accessibleState.Interpreter().evm.Commit && !accessibleState.Interpreter().evm.EthCall {
+			return importRandomCiphertext(accessibleState, lhs.ciphertext.fheUintType), nil
+		}
+
+		result, err := lhs.ciphertext.scalarRem(rhs.Uint64())
+		if err != nil {
+			logger.Error("fheRem failed", "err", err)
+			return nil, err
+		}
+		importCiphertext(accessibleState, result)
+
+		// TODO: for testing
+		writeResult(result, "rem_scalar_result", logger)
+
+		resultHash := result.getHash()
+		logger.Info("fheRem scalar success", "lhs", lhs.ciphertext.getHash().Hex(), "rhs", rhs.Uint64(), "result", resultHash.Hex())
 		return resultHash[:], nil
 	}
 }

@@ -1397,6 +1397,55 @@ func FheLibDiv(t *testing.T, fheUintType fheUintType, scalar bool) {
 	}
 }
 
+func FheLibRem(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 7
+		rhs = 3
+	case FheUint16:
+		lhs = 721
+		rhs = 1000
+	case FheUint32:
+		lhs = 1337
+		rhs = 73
+	}
+	expected := lhs % rhs
+	c := &fheLib{}
+	signature := "fheRem(uint256,uint256,bytes1)"
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toLibPrecompileInput(signature, scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	} else {
+		if err == nil {
+			t.Fatal("Non scalar remainder should fail")
+		}
+	}
+}
+
 func FheLibBitAnd(t *testing.T, fheUintType fheUintType, scalar bool) {
 	var lhs, rhs uint64
 	switch fheUintType {
@@ -1922,6 +1971,54 @@ func FheDiv(t *testing.T, fheUintType fheUintType, scalar bool) {
 	} else {
 		if err == nil {
 			t.Fatal("Non scalar multiplication should fail")
+		}
+	}
+}
+
+func FheRem(t *testing.T, fheUintType fheUintType, scalar bool) {
+	var lhs, rhs uint64
+	switch fheUintType {
+	case FheUint8:
+		lhs = 9
+		rhs = 5
+	case FheUint16:
+		lhs = 1773
+		rhs = 523
+	case FheUint32:
+		lhs = 123765
+		rhs = 2179
+	}
+	expected := lhs % rhs
+	c := &fheRem{}
+	depth := 1
+	state := newTestState()
+	state.interpreter.evm.depth = depth
+	addr := common.Address{}
+	readOnly := false
+	lhsHash := verifyCiphertextInTestMemory(state.interpreter, lhs, depth, fheUintType).getHash()
+	var rhsHash common.Hash
+	if scalar {
+		rhsHash = common.BytesToHash(big.NewInt(int64(rhs)).Bytes())
+	} else {
+		rhsHash = verifyCiphertextInTestMemory(state.interpreter, rhs, depth, fheUintType).getHash()
+	}
+	input := toPrecompileInput(scalar, lhsHash, rhsHash)
+	out, err := c.Run(state, addr, addr, input, readOnly)
+	if scalar {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		res := getVerifiedCiphertextFromEVM(state.interpreter, common.BytesToHash(out))
+		if res == nil {
+			t.Fatalf("output ciphertext is not found in verifiedCiphertexts")
+		}
+		decrypted, err := res.ciphertext.decrypt()
+		if err != nil || decrypted.Uint64() != expected {
+			t.Fatalf("invalid decrypted result, decrypted %v != expected %v", decrypted.Uint64(), expected)
+		}
+	} else {
+		if err == nil {
+			t.Fatal("Non scalar remainder should fail")
 		}
 	}
 }
@@ -3126,6 +3223,10 @@ func TestFheLibDiv8(t *testing.T) {
 	FheLibDiv(t, FheUint8, true)
 }
 
+func TestFheLibRem8(t *testing.T) {
+	FheLibRem(t, FheUint8, true)
+}
+
 func TestFheLibBitAnd8(t *testing.T) {
 	FheLibBitAnd(t, FheUint8, false)
 }
@@ -3244,6 +3345,30 @@ func TestFheScalarDiv16(t *testing.T) {
 
 func TestFheScalarDiv32(t *testing.T) {
 	FheDiv(t, FheUint32, true)
+}
+
+func TestFheRem8(t *testing.T) {
+	FheRem(t, FheUint8, false)
+}
+
+func TestFheRem16(t *testing.T) {
+	FheRem(t, FheUint16, false)
+}
+
+func TestFheRem32(t *testing.T) {
+	FheRem(t, FheUint32, false)
+}
+
+func TestFheScalarRem8(t *testing.T) {
+	FheRem(t, FheUint8, true)
+}
+
+func TestFheScalarRem16(t *testing.T) {
+	FheRem(t, FheUint16, true)
+}
+
+func TestFheScalarRem32(t *testing.T) {
+	FheRem(t, FheUint32, true)
 }
 
 func TestFheBitAnd8(t *testing.T) {
