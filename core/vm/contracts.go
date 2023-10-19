@@ -94,7 +94,10 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},            // lib
 	common.BytesToAddress([]byte{91}): &decrypt{},           // lib
 	common.BytesToAddress([]byte{92}): &fheDiv{},            // lib
-	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{0x03, 0x46, 0x48, 0x45, 0x56,
+		0x4d, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}): &fheLib{},
 	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -139,7 +142,10 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
-	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{0x03, 0x46, 0x48, 0x45, 0x56,
+		0x4d, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}): &fheLib{},
 	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -185,7 +191,10 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
-	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{0x03, 0x46, 0x48, 0x45, 0x56,
+		0x4d, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}): &fheLib{},
 	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -231,7 +240,10 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
-	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{0x03, 0x46, 0x48, 0x45, 0x56,
+		0x4d, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}): &fheLib{},
 	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
@@ -277,7 +289,10 @@ var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{90}): &fheNot{},
 	common.BytesToAddress([]byte{91}): &decrypt{},
 	common.BytesToAddress([]byte{92}): &fheDiv{},
-	common.BytesToAddress([]byte{93}): &fheLib{},
+	common.BytesToAddress([]byte{0x03, 0x46, 0x48, 0x45, 0x56,
+		0x4d, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}): &fheLib{},
 	common.BytesToAddress([]byte{94}): &fheRem{},
 	common.BytesToAddress([]byte{99}): &faucet{},
 }
