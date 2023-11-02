@@ -190,9 +190,9 @@ const (
 	FheUint32NegNotGas  uint64 = 130000
 
 	// TODO: Costs will depend on the complexity of doing reencryption/decryption by the oracle.
-	FheUint8ReencryptGas  uint64 = 1000
-	FheUint16ReencryptGas uint64 = 1100
-	FheUint32ReencryptGas uint64 = 1200
+	FheUint8ReencryptGas  uint64 = 320000
+	FheUint16ReencryptGas uint64 = 320400
+	FheUint32ReencryptGas uint64 = 320800
 	FheUint8DecryptGas    uint64 = 320000
 	FheUint16DecryptGas   uint64 = 320400
 	FheUint32DecryptGas   uint64 = 320800
