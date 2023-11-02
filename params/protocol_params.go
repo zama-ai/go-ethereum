@@ -160,18 +160,19 @@ const (
 	RefundQuotientEIP3529 uint64 = 5
 
 	// FHE operation costs depend on tfhe-rs performance and hardware acceleration. These values will most certainly change.
-	FheUint8AddSubGas   uint64 = 83000
-	FheUint16AddSubGas  uint64 = 108000
-	FheUint32AddSubGas  uint64 = 130000
-	FheUint8MulGas      uint64 = 150000
-	FheUint16MulGas     uint64 = 200000
-	FheUint32MulGas     uint64 = 270000
-	FheUint8DivGas      uint64 = 1370000
-	FheUint16DivGas     uint64 = 3500000
-	FheUint32DivGas     uint64 = 9120000
-	FheUint8RemGas      uint64 = 1370000 // TODO: check again rem gas
-	FheUint16RemGas     uint64 = 3500000
-	FheUint32RemGas     uint64 = 9120000
+	FheUint8AddSubGas  uint64 = 83000
+	FheUint16AddSubGas uint64 = 108000
+	FheUint32AddSubGas uint64 = 130000
+	FheUint8MulGas     uint64 = 150000
+	FheUint16MulGas    uint64 = 200000
+	FheUint32MulGas    uint64 = 270000
+	// Div and Rem currently only support a plaintext divisor and below gas costs reflect that case only.
+	FheUint8DivGas      uint64 = 200000
+	FheUint16DivGas     uint64 = 250000
+	FheUint32DivGas     uint64 = 350000
+	FheUint8RemGas      uint64 = 200000
+	FheUint16RemGas     uint64 = 250000
+	FheUint32RemGas     uint64 = 350000
 	FheUint8BitwiseGas  uint64 = 20000
 	FheUint16BitwiseGas uint64 = 21000
 	FheUint32BitwiseGas uint64 = 22000
@@ -192,9 +193,9 @@ const (
 	FheUint8ReencryptGas  uint64 = 1000
 	FheUint16ReencryptGas uint64 = 1100
 	FheUint32ReencryptGas uint64 = 1200
-	FheUint8DecryptGas    uint64 = 600
-	FheUint16DecryptGas   uint64 = 700
-	FheUint32DecryptGas   uint64 = 800
+	FheUint8DecryptGas    uint64 = 320000
+	FheUint16DecryptGas   uint64 = 320400
+	FheUint32DecryptGas   uint64 = 320800
 
 	// As of now, verification costs only cover ciphertext deserialization and assume there is no ZKPoK to verify.
 	FheUint8VerifyGas  uint64 = 200
@@ -202,9 +203,9 @@ const (
 	FheUint32VerifyGas uint64 = 400
 
 	// TODO: Cost will depend on the complexity of doing decryption by the oracle.
-	FheUint8RequireGas  uint64 = 170000
-	FheUint16RequireGas uint64 = 180000
-	FheUint32RequireGas uint64 = 190000
+	FheUint8RequireGas  uint64 = 320000
+	FheUint16RequireGas uint64 = 320400
+	FheUint32RequireGas uint64 = 320800
 
 	// TODO: As of now, only support FheUint8. All optimistic require predicates are
 	// downcast to FheUint8 at the solidity level. Eventually move to ebool.
